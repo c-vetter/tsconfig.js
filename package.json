@@ -4,7 +4,7 @@
   "description": "Polyfill for tsconfig.js, because TypeScript does not natively support JS config files",
   "main": "index.js",
   "bin": "cli.js",
-  "files": [],
+  "files": ["cli.js"],
   "scripts": {
     "test": "ava tests.js"
   },
