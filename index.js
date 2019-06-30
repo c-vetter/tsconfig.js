@@ -4,6 +4,7 @@ const chokidar = require('chokidar')
 const fs = require('fs-extra')
 
 module.exports = tsconfig
+tsconfig.watch = watch
 
 async function tsconfig(root, ignore=[]) {
 	if (!root) {
@@ -35,6 +36,41 @@ async function tsconfig(root, ignore=[]) {
 	})
 }
 
+function watch(root, ignore=[]) {
+	if (!root) {
+		const watcher = new chokidar.FSWatcher()
+		watcher.close()
+		setImmediate(() => watcher.emit(
+			'error',
+			new Error('you need to provide the base path for tsconfig.js to work')
+		))
+
+		return watcher
+	}
+
+	if (!Array.isArray(ignore)) {
+		ignore = [ignore]
+	}
+
+	const watcher = chokidar.watch(`${root}/**/tsconfig.js`, {
+		awaitWriteFinish: true,
+		ignoreInitial: false,
+		ignored: [
+			'**/.git/**',
+			'**/node_modules/**',
+
+			...ignore,
+		],
+	})
+
+	watcher.on('add', file => build(file))
+	watcher.on('change', file => build(file))
+
+	watcher.on('unlink', file => unlink(file))
+
+	return watcher
+}
+
 function build(file) {
 	const filepath = path.resolve(file)
 
@@ -47,3 +83,7 @@ function build(file) {
 	)
 }
 
+function unlink(file) {
+	const filepath = path.resolve(`${file}on`)
+	return fs.remove(filepath)
+}

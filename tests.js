@@ -1,5 +1,7 @@
 const path = require('path')
+const EventEmitter = require('events')
 
+const chokidar = require('chokidar')
 const fs = require('fs-extra')
 const readdirp = require('readdirp')
 const test = require('ava')
@@ -14,68 +16,201 @@ const target = (...segments) => path.join('__tmp__', ...segments)
 const src = 'src';
 const ctrl = 'ctrl';
 
-test.serial('returns a Promise', async t => {
+
+// Interface
+
+
+test.serial('simple call returns a Promise', async t => {
 	const promise = tsconfig(target())
 	t.assert(promise instanceof Promise)
 	await promise
 })
-test.serial('requires a base path', async t => {
+
+test.serial('simple call requires a base path', async t => {
 	await t.throwsAsync(() => tsconfig())
 })
 
-check('builds json files properly', 'base')
-check('overwrites pre-existing json file if js file present', 'overwrite')
-check('leaves out invalid files', 'guard')
-check('leaves out undesired files', 'guard-custom', ['**/sub/**'])
+test.serial('watch call returns a closable EventEmitter', t => {
+	[
+		tsconfig.watch(),
+		tsconfig.watch(target()),
+	].forEach(eventEmitter => {
+		t.assert(eventEmitter instanceof EventEmitter)
 
-function sample(namespace) {
-	const source = (...paths) => path.join('__samples__', namespace, ...paths)
+		eventEmitter.on('error', ()=>{})
 
-	fs.emptyDirSync(target())
-	fs.copySync(source(src), target())
+		try {
+			t.assert(eventEmitter.close, 'missing `close` method')
+			eventEmitter.close()
+		} catch(error) {
+			eventEmitter.removeAllListeners()
+			throw error
+		}
+	})
+})
 
-	const run = (ignore) => tsconfig(target(), ignore)
+test.serial('watch call requires a base path', async t => {
+	const error = await new Promise((resolve, reject) => {
+		const watcher = tsconfig.watch()
+		watcher.on('error', resolve)
 
-	return {
-		run,
+		setTimeout(() => {
+			reject('no error event emitted within 1000ms')
+		}, 1000);
+	})
+
+	t.assert(error)
+
+	return new Promise((resolve, reject) => {
+		const watcher = tsconfig.watch(target())
+		watcher.on('error', reject)
+
+		setTimeout(() => {
+			watcher.close()
+			resolve()
+		}, 1000);
+	})
+})
+
+
+// Complex scenarios
+
+
+sample('builds json files properly', 'base')
+sample('overwrites pre-existing json file if js file present', 'overwrite')
+sample('leaves out invalid files', 'guard')
+sample('leaves out undesired files', 'guard-custom', ['**/sub/**'])
+
+
+test.serial('watcher updates json files when respective js files are changed', async t => {
+	const {
 		source,
-	}
-}
+		watch,
+	} = prepare('watch')
 
-function check(label, namespace, ignore) {
+	const watcher = watch()
+
+	await new Promise((resolve, reject) => {
+		watcher.on('error', reject)
+		watcher.on('ready', resolve)
+	})
+
+	await checkFiles(source, t)
+
+	const update = prepare('base', true)
+
+	// TODO: resolve race condition and/or enable dependency mapping
+	// await new Promise(r => setTimeout(r, 1000))
+	// await checkFiles(update.source, t)
+
+	watcher.close()
+})
+
+
+test.serial('watcher removes json files when respective js files are deleted', async t => {
+	const {
+		watch,
+	} = prepare('watch')
+
+	const watcher = watch()
+	await new Promise((resolve, reject) => {
+		watcher.on('error', reject)
+		watcher.on('ready', () => {
+			const checker = chokidar.watch(target('**', 'tsconfig.json').replace(/\\/g, '/'))
+
+			checker.on('ready', () => {
+				checker.once('unlink', () => {
+					checker.once('unlink', resolve)
+
+					fs.remove(target('tsconfig.js')).then(() => setTimeout(() => {
+						reject('json file was not removed within 500ms')
+					}, 500))
+				})
+
+				fs.remove(target('sub/tsconfig.js')).then(() => {
+					setTimeout(() => {
+						reject('no json file was removed within 2500ms')
+					}, 2500)
+				})
+			})
+		})
+	})
+	.finally(()=>watcher.close())
+
+	t.pass()
+})
+
+
+// Helpers
+
+
+function sample (label, namespace, ignore) {
 	test.serial(label, async t => {
 		const {
 			run,
 			source,
-		} = sample(namespace)
+		} = prepare(namespace)
 
 		await run(ignore)
+		await checkFiles(source, t)
 
-		const ctrlPaths = readdirp.promise(source(ctrl), {
-			fileFilter: ['tsconfig.json'],
+		const {
+			watch,
+		} = prepare(namespace)
+
+		const watcher = watch(ignore)
+		await new Promise((resolve, reject) => {
+			watcher.on('error', reject)
+			watcher.on('ready', ()=>watcher.close())
+			watcher.on('ready', resolve)
 		})
-		.then(mapToBasePaths)
 
-		const resultPaths = readdirp.promise(target(), {
-			fileFilter: ['tsconfig.json'],
-		})
-		.then(mapToBasePaths)
-
-
-		return (
-			Promise.all([ resultPaths, ctrlPaths ]).then(([ result, ctrl ]) => {
-				// all expected files are there
-				ctrl.forEach(p => t.true(result.includes(p), `missing file ${p}`))
-
-				// no unexpected files
-				result.forEach(p => t.true(ctrl.includes(p), `unexpected file ${p}`))
-
-				return result
-			})
-			.then(paths => paths.forEach(p => t.deepEqual(
-				fs.readJsonSync(source(ctrl, p)),
-				fs.readJsonSync(target(p)),
-			)))
-		)
+		await checkFiles(source, t)
 	})
+}
+
+function prepare (namespace, keep=false) {
+	const source = (...paths) => path.join('__samples__', namespace, ...paths)
+
+	keep || fs.emptyDirSync(target())
+	fs.copySync(source(src), target())
+
+	const run = (ignore) => tsconfig(target(), ignore)
+	const watch = (ignore) => tsconfig.watch(target(), ignore)
+
+	return {
+		run,
+		source,
+		watch,
+	}
+}
+
+function checkFiles (source, t) {
+	return collectPaths(source)
+	.then(([ result, ctrl ]) => {
+		// all expected files are there
+		ctrl.forEach(p => t.true(result.includes(p), `missing file ${p}`))
+
+		// no unexpected files
+		result.forEach(p => t.true(ctrl.includes(p), `unexpected file ${p}`))
+
+		return result
+	})
+	.then(paths => paths.forEach(p => t.deepEqual(
+		fs.readJsonSync(source(ctrl, p)),
+		fs.readJsonSync(target(p)),
+		`aberration in ${p}`
+	)))
+}
+
+function collectPaths (source) {
+	const collect = what => readdirp.promise(what, {
+		fileFilter: ['tsconfig.json'],
+	})
+	.then(mapToBasePaths)
+
+	const ctrlPaths = collect(source(ctrl))
+	const resultPaths = collect(target())
+
+	return Promise.all([ resultPaths, ctrlPaths ])
 }
