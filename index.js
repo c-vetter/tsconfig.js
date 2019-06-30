@@ -31,7 +31,11 @@ async function tsconfig(root, ignore=[]) {
 
 		watcher.on('add', file => all.push(build(file)))
 		watcher.on('ready', () => watcher.close())
-		watcher.on('ready', () => resolve(Promise.all(all)))
+
+		watcher.on('ready', () =>
+			Promise.all(all)
+			.then(resolve, reject)
+		)
 
 		watcher.on('error', reject)
 	})
@@ -63,25 +67,34 @@ function watch(root, ignore=[]) {
 		],
 	})
 
-	watcher.on('add', file => build(file))
-	watcher.on('change', file => build(file))
+	const emitError = e => watcher.emit('error', e)
 
-	watcher.on('unlink', file => unlink(file))
+	watcher.on('add', file => build(file).catch(emitError))
+	watcher.on('change', file => build(file).catch(emitError))
+
+	watcher.on('unlink', file => unlink(file).catch(emitError))
 
 	return watcher
 }
 
-function build(file) {
+async function build(file) {
 	const filepath = clearCache(file)
-	const config = require(filepath)
 
-	return fs.writeJson(
-		`${filepath}on`,
-		config
-	)
+	try {
+		const config = require(filepath)
+
+		return fs.writeJson(
+			`${filepath}on`,
+			config
+		)
+	} catch (e) {
+		e.stack = `Error: ${e.message}\n    at ${filepath}`
+
+		throw e
+	}
 }
 
-function unlink(file) {
+async function unlink(file) {
 	const filepath = path.resolve(`${file}on`)
 	return fs.remove(filepath)
 }

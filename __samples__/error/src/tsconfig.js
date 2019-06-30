@@ -1,0 +1,1 @@
+const baseConfig = require('../tsconfig')

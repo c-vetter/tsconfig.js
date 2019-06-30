@@ -4,7 +4,7 @@
 // drop `node` and `cli.js`, the actual parameters come after those
 const ignore = process.argv.slice(2)
 
-let builder = require('.')
+const builder = require('.')
 let root = '.'
 
 const rootParam = '--root'
@@ -18,10 +18,14 @@ if (ignore.includes(rootParam)) {
 	}
 }
 
-if (ignore.includes(noWatchFlag)) {
-	ignore.splice(ignore.indexOf(noWatchFlag), 1)
+const watch = !ignore.includes(noWatchFlag)
+if (watch) {
+	builder.watch(root, ignore)
+	.on('error', e => console.error(e))
+	.once('error', () => process.exitCode = 1)
 } else {
-	builder = builder.watch
-}
+	ignore.splice(ignore.indexOf(noWatchFlag), 1)
 
-builder(root, ignore)
+	builder(root, ignore)
+	.catch(e => setImmediate(() => { throw e }))
+}

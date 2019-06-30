@@ -13,25 +13,31 @@ const mapToBasePaths = entry => entry.map(({path}) => baseFor(path))
 const target = (...segments) => path.join('__tmp__', ...segments)
 
 
-const src = 'src';
-const ctrl = 'ctrl';
+const src = 'src'
+const ctrl = 'ctrl'
 
 
 // Interface
 
 
 test.serial('simple call returns a Promise', async t => {
+	clean()
+
 	const promise = tsconfig(target())
 	t.assert(promise instanceof Promise)
 	await promise
 })
 
 test.serial('simple call requires a base path', async t => {
+	clean()
+
 	await t.throwsAsync(() => tsconfig())
 })
 
 test.serial('watch call returns a closable EventEmitter', t => {
-	[
+	clean()
+
+	;[
 		tsconfig.watch(),
 		tsconfig.watch(target()),
 	].forEach(eventEmitter => {
@@ -50,13 +56,16 @@ test.serial('watch call returns a closable EventEmitter', t => {
 })
 
 test.serial('watch call requires a base path', async t => {
+	clean()
+
 	const error = await new Promise((resolve, reject) => {
 		const watcher = tsconfig.watch()
 		watcher.on('error', resolve)
 
 		setTimeout(() => {
-			reject('no error event emitted within 1000ms')
-		}, 500);
+			watcher.close()
+			reject('no error event emitted within 500ms')
+		}, 500)
 	})
 
 	t.assert(error)
@@ -68,7 +77,7 @@ test.serial('watch call requires a base path', async t => {
 		setTimeout(() => {
 			watcher.close()
 			resolve()
-		}, 1000);
+		}, 1000)
 	})
 })
 
@@ -90,20 +99,22 @@ test.serial('watcher updates json files when respective js files are changed', a
 
 	const watcher = watch()
 
-	await new Promise((resolve, reject) => {
-		watcher.on('error', reject)
-		watcher.on('ready', resolve)
-	})
+	try {
+		await new Promise((resolve, reject) => {
+			watcher.on('error', reject)
+			watcher.on('ready', resolve)
+		})
 
-	await checkFiles(source, t)
+		await checkFiles(source, t)
 
-	const update = prepare('base', true)
+		const update = prepare('base', true)
 
-	await new Promise(r => setTimeout(r, 500))
+		await new Promise(r => setTimeout(r, 500))
 
-	await checkFiles(update.source, t)
-
-	watcher.close()
+		await checkFiles(update.source, t)
+	} finally {
+		watcher.close()
+	}
 })
 
 
@@ -141,6 +152,40 @@ test.serial('watcher removes json files when respective js files are deleted', a
 })
 
 
+// Error Handling
+
+
+test.serial('rejects on error', async t => {
+	const {
+		run,
+	} = prepare('error')
+
+	await t.throwsAsync(() => run())
+})
+
+
+test.serial('watcher emits errors', async t => {
+	const {
+		watch,
+	} = prepare('error')
+
+	const watcher = watch()
+
+	t.assert(
+		await new Promise((resolve, reject) => {
+			watcher.on('error', resolve)
+
+			watcher.on('ready', () =>
+				setTimeout(() => {
+					reject('no error event emitted within 500ms')
+				}, 500)
+			)
+		})
+		.finally(() => watcher.close())
+	)
+})
+
+
 // Helpers
 
 
@@ -172,7 +217,7 @@ function sample (label, namespace, ignore) {
 function prepare (namespace, keep=false) {
 	const source = (...paths) => path.join('__samples__', namespace, ...paths)
 
-	keep || fs.emptyDirSync(target())
+	keep || clean()
 	fs.copySync(source(src), target())
 
 	const run = (ignore) => tsconfig(target(), ignore)
@@ -183,6 +228,10 @@ function prepare (namespace, keep=false) {
 		source,
 		watch,
 	}
+}
+
+function clean() {
+	fs.emptyDirSync(target())
 }
 
 function checkFiles (source, t) {
