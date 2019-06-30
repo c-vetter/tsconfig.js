@@ -56,7 +56,7 @@ test.serial('watch call requires a base path', async t => {
 
 		setTimeout(() => {
 			reject('no error event emitted within 1000ms')
-		}, 1000);
+		}, 500);
 	})
 
 	t.assert(error)
@@ -99,9 +99,9 @@ test.serial('watcher updates json files when respective js files are changed', a
 
 	const update = prepare('base', true)
 
-	// TODO: resolve race condition and/or enable dependency mapping
-	// await new Promise(r => setTimeout(r, 1000))
-	// await checkFiles(update.source, t)
+	await new Promise(r => setTimeout(r, 500))
+
+	await checkFiles(update.source, t)
 
 	watcher.close()
 })
