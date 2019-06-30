@@ -79,7 +79,7 @@ test.serial('watch call requires a base path', async t => {
 sample('builds json files properly', 'base')
 sample('overwrites pre-existing json file if js file present', 'overwrite')
 sample('leaves out invalid files', 'guard')
-sample('leaves out undesired files', 'guard-custom', ['**/sub/**'])
+sample('leaves out undesired files', 'guard-custom', ['**/sub'])
 
 
 test.serial('watcher updates json files when respective js files are changed', async t => {

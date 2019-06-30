@@ -20,8 +20,8 @@ async function tsconfig(root, ignore=[]) {
 		const watcher = chokidar.watch(`${root}/**/tsconfig.js`, {
 			ignoreInitial: false,
 			ignored: [
-				'**/.git/**',
-				'**/node_modules/**',
+				'**/.git',
+				'**/node_modules',
 
 				...ignore,
 			],
