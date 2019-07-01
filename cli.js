@@ -21,11 +21,22 @@ if (ignore.includes(rootParam)) {
 const watch = !ignore.includes(noWatchFlag)
 if (watch) {
 	builder.watch(root, ignore)
-	.on('error', e => console.error(e))
-	.once('error', () => process.exitCode = 1)
+	.on('error', printError)
 } else {
 	ignore.splice(ignore.indexOf(noWatchFlag), 1)
 
 	builder(root, ignore)
-	.catch(e => setImmediate(() => { throw e }))
+	.catch(e => {
+		process.exitCode = 1
+		printError(e)
+	})
+}
+
+
+function printError(error) {
+	console.error(
+		error.stack ||
+		error.message ||
+		error
+	)
 }

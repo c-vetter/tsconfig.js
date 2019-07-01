@@ -1,44 +1,22 @@
-const chokidar = require('chokidar')
+const { DepGraph } = require('dependency-graph')
 const fs = require('fs-extra')
 
-const { DepGraph } = new require('dependency-graph')
-
 const extractDependencies = require('./extract-dependencies')
+const make = require('./make')
 const resolvePath = require('./resolve-path')
+const watch = require('./watcher')
 
-module.exports = watch
+module.exports = tsconfigWatch
 
-function watch (root, ignore=[]) {
-	if (!root) {
-		const watcher = new chokidar.FSWatcher()
-		watcher.close()
-		setImmediate(() => watcher.emit(
-			'error',
-			new Error('you need to provide the base path for tsconfig.js to work')
-		))
+function tsconfigWatch (root, ignore=[]) {
+	const watcher = watch(root, ignore)
 
-		return watcher
-	}
-
-	if (!Array.isArray(ignore)) {
-		ignore = [ignore]
-	}
-
-	const watcher = chokidar.watch(`${root}/**/tsconfig.js`, {
-		ignoreInitial: false,
-		ignored: [
-			'**/.git/**',
-			'**/node_modules/**',
-
-			...ignore,
-		],
-	})
+	const dependenciesMap = new DepGraph()
 
 	let _queue = Promise.resolve()
 	const queue = (action) => { _queue = _queue.then(action) }
-	const dependenciesMap = new DepGraph()
-	const emitError = e => watcher.emit('error', e)
 
+	const emitError = e => watcher.emit('error', e)
 	watcher.on('add', file => queue(() => add(file).catch(emitError)))
 	watcher.on('change', file => queue(() => update(file).catch(emitError)))
 	watcher.on('unlink', file => queue(() => remove(file).catch(emitError)))
@@ -78,6 +56,24 @@ function watch (root, ignore=[]) {
 
 
 	// Helpers
+
+	async function build (filepath) {
+		return Promise.all(
+			[filepath]
+			.concat(dependenciesMap.dependantsOf(filepath))
+			.map(fp => delete require.cache[fp] && fp)
+			// two-step process so as to first clear all cache entries, then make all files
+			.map(make)
+		)
+	}
+
+	async function unwatchDependency (filepath) {
+		removeDependency(filepath)
+
+		if (dependenciesMap.dependantsOf(filepath).length === 0) {
+			watcher.unwatch(filepath)
+		}
+	}
 
 	function removeDependency (filepath) {
 		const dependencies = dependenciesMap.dependenciesOf(filepath)
@@ -124,27 +120,5 @@ function watch (root, ignore=[]) {
 			dependenciesMap.addDependency(filepath, dependency)
 
 		}))
-	}
-
-	async function unwatchDependency (filepath) {
-		removeDependency(filepath)
-
-		if (dependenciesMap.dependantsOf(filepath).length === 0) {
-			watcher.unwatch(filepath)
-		}
-	}
-
-	async function build (filepath) {
-		const make = fp => fs.writeJson(
-			`${fp}on`,
-			require(fp)
-		)
-
-		return Promise.all(
-			[filepath]
-			.concat(dependenciesMap.dependantsOf(filepath))
-			.map(fp => delete require.cache[fp] && fp)
-			.map(fp => make(fp))
-		)
 	}
 }
