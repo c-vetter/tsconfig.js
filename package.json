@@ -1,10 +1,13 @@
 {
   "name": "tsconfig.js",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "Polyfill for tsconfig.js, because TypeScript does not natively support JS config files",
   "main": "index.js",
   "bin": "cli.js",
-  "files": ["cli.js"],
+  "files": [
+    "cli.js",
+    "src/*.js"
+  ],
   "scripts": {
     "test": "ava tests.js"
   },
@@ -29,6 +32,7 @@
   },
   "dependencies": {
     "chokidar": "^3.0.1",
+    "dependency-graph": "^0.8.0",
     "fs-extra": "^8.0.1"
   }
 }

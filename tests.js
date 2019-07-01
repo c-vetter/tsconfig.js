@@ -210,6 +210,8 @@ function sample (label, namespace, ignore) {
 			watcher.on('ready', resolve)
 		})
 
+		await new Promise(r => setTimeout(r, 500))
+
 		await checkFiles(source, t)
 	})
 }
