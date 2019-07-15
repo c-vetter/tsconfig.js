@@ -135,10 +135,10 @@ sample('overwrites pre-existing json file if js file present', 'overwrite')
 sample('leaves out invalid files', 'guard')
 sample('leaves out undesired files', 'guard-custom', ['**/sub'])
 sample('ignores directories and files', 'ignore', [
-	path.resolve(target('ignore-directory')),
-	path.resolve(target('ignore-file', jsFile)),
+	target('ignore-directory'),
+	target('ignore-file', jsFile),
 ])
-sample('does not build dependencies', 'dependencies', path.resolve(target(jsFile)))
+sample('does not build dependencies', 'dependencies', target(jsFile))
 
 
 test.serial('watcher updates json files when respective js files are changed', async t => {

@@ -1,3 +1,5 @@
+const path = require('path')
+
 const EventEmitter = require('events')
 const chokidar = require('chokidar')
 
@@ -38,7 +40,7 @@ module.exports = function watch({root, ignore, dependencies}) {
 			'**/.git',
 			'**/node_modules',
 
-			...ignore,
+			...ignore.map(fp => resolvePath(fp))
 		],
 	})
 
