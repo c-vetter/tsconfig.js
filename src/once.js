@@ -1,37 +1,40 @@
 const extractDependencies = require('./extract-dependencies')
 const make = require('./make')
-const resolvePath = require('./resolve-path')
 const watch = require('./watcher')
+
+const {
+	ERROR,
+	READY,
+	CREATE_TARGET: FIND,
+} = require('./events')
 
 module.exports = tsconfig
 
 function tsconfig (root, ignore=[]) {
 	return new Promise((resolve, reject) => {
-		const watcher = watch(root, ignore)
-		watcher.on('error', reject)
+		const watcher = watch({root, ignore})
+		watcher.on(ERROR, reject)
 
 		const all = []
 
-		watcher.on('add', file => all.push(build(file).catch(reject)))
-		watcher.on('ready', () => watcher.close())
+		watcher.on(FIND, file => all.push(build(file).catch(reject)))
+		watcher.on(READY, () => watcher.close())
 
-		watcher.on('ready', () =>
+		watcher.on(READY, () =>
 			Promise.all(all).then(resolve)
 		)
 	})
 }
 
-async function build (file) {
-	const filepath = await resolvePath(file)
-
+async function build (filepath) {
 	clearCache(filepath)
-	make(filepath)
+	return make(filepath)
 }
 
-async function clearCache (filepath) {
+function clearCache (filepath) {
 	delete require.cache[filepath]
 
-	const dependencies = await extractDependencies(filepath)
+	const dependencies = extractDependencies(filepath)
 	if (!dependencies) return
 
 	dependencies.forEach(clearCache)

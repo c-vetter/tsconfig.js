@@ -8,6 +8,14 @@ const test = require('ava')
 
 const tsconfig = require('.')
 
+const {
+	ERROR,
+	READY,
+	CREATE,
+	UPDATE,
+	DELETE,
+} = require('./src/events')
+
 const baseFor = p => path.join(path.dirname(p), path.basename(p))
 const mapToBasePaths = entry => entry.map(({path}) => baseFor(path))
 const target = (...segments) => path.join('__tmp__', ...segments)
@@ -20,18 +28,19 @@ const ctrl = 'ctrl'
 // Interface
 
 
-test.serial('simple call returns a Promise', async t => {
+test.serial('simple call returns a Promise', t => {
 	clean()
 
 	const promise = tsconfig(target())
 	t.assert(promise instanceof Promise)
-	await promise
+
+	return promise
 })
 
-test.serial('simple call requires a base path', async t => {
+test.serial('simple call requires a base path', t => {
 	clean()
 
-	await t.throwsAsync(() => tsconfig())
+	return t.throwsAsync(() => tsconfig())
 })
 
 test.serial('watch call returns a closable EventEmitter', t => {
@@ -43,13 +52,15 @@ test.serial('watch call returns a closable EventEmitter', t => {
 	].forEach(eventEmitter => {
 		t.assert(eventEmitter instanceof EventEmitter)
 
-		eventEmitter.on('error', ()=>{})
+		eventEmitter.on(ERROR, ()=>{})
 
 		try {
 			t.assert(eventEmitter.close, 'missing `close` method')
+
 			eventEmitter.close()
 		} catch(error) {
 			eventEmitter.removeAllListeners()
+
 			throw error
 		}
 	})
@@ -60,7 +71,7 @@ test.serial('watch call requires a base path', async t => {
 
 	const error = await new Promise((resolve, reject) => {
 		const watcher = tsconfig.watch()
-		watcher.on('error', resolve)
+		watcher.on(ERROR, resolve)
 
 		setTimeout(() => {
 			watcher.close()
@@ -72,7 +83,7 @@ test.serial('watch call requires a base path', async t => {
 
 	return new Promise((resolve, reject) => {
 		const watcher = tsconfig.watch(target())
-		watcher.on('error', reject)
+		watcher.on(ERROR, reject)
 
 		setTimeout(() => {
 			watcher.close()
@@ -89,6 +100,7 @@ sample('builds json files properly', 'base')
 sample('overwrites pre-existing json file if js file present', 'overwrite')
 sample('leaves out invalid files', 'guard')
 sample('leaves out undesired files', 'guard-custom', ['**/sub'])
+sample('does not build dependencies', 'dependencies', path.resolve(target('tsconfig.js')))
 
 
 test.serial('watcher updates json files when respective js files are changed', async t => {
@@ -101,8 +113,8 @@ test.serial('watcher updates json files when respective js files are changed', a
 
 	try {
 		await new Promise((resolve, reject) => {
-			watcher.on('error', reject)
-			watcher.on('ready', resolve)
+			watcher.on(ERROR, reject)
+			watcher.on(READY, resolve)
 		})
 
 		await checkFiles(source, t)
@@ -125,28 +137,123 @@ test.serial('watcher removes json files when respective js files are deleted', a
 
 	const watcher = watch()
 	await new Promise((resolve, reject) => {
-		watcher.on('error', reject)
-		watcher.on('ready', () => {
-			const checker = chokidar.watch(target('**', 'tsconfig.json').replace(/\\/g, '/'))
-
-			checker.on('ready', () => {
-				checker.once('unlink', () => {
-					checker.once('unlink', resolve)
-
-					fs.remove(target('tsconfig.js')).then(() => setTimeout(() => {
-						reject('json file was not removed within 500ms')
-					}, 500))
-				})
-
-				fs.remove(target('sub/tsconfig.js')).then(() => {
-					setTimeout(() => {
-						reject('no json file was removed within 2500ms')
-					}, 2500)
-				})
-			})
-		})
+		watcher.on(ERROR, reject)
+		watcher.on(READY, resolve)
 	})
-	.finally(()=>watcher.close())
+
+	const checker = chokidar.watch(target('**', 'tsconfig.json').replace(/\\/g, '/'))
+	await new Promise((resolve, reject) => {
+		checker.on(ERROR, reject)
+		checker.on(READY, resolve)
+	})
+
+	await new Promise((resolve, reject) => {
+		watcher.on(ERROR, reject)
+		checker.on(ERROR, reject)
+
+		checker.once(DELETE, () => {
+			checker.once(DELETE, resolve)
+
+			fs.removeSync(target('tsconfig.js'))
+
+			setTimeout(() => {
+				reject('json file was not removed within 500ms')
+			}, 500)
+		})
+
+		fs.removeSync(target('sub/tsconfig.js'))
+		setTimeout(() => {
+			reject('no json file was removed within 1000ms')
+		}, 1000)
+	})
+	.finally(() => {
+		watcher.close()
+		checker.close()
+	})
+
+	t.pass()
+})
+
+
+test.serial('watcher triggers rebuild from dependency', async t => {
+	const {
+		source,
+	} = prepare('base')
+
+	prepare('watch')
+
+	fs.copySync(
+		source(src, 'sub', 'tsconfig.js'),
+		target('sub', 'tsconfig.js')
+	)
+
+
+	const watcher = tsconfig.watch(target('sub'))
+	await new Promise((resolve, reject) => {
+		watcher.on(ERROR, reject)
+		watcher.on(READY, resolve)
+	})
+
+	const checker = chokidar.watch(target('sub', 'tsconfig.json'))
+	await new Promise((resolve, reject) => {
+		checker.on(ERROR, reject)
+		checker.on(READY, resolve)
+	})
+
+	await new Promise((resolve, reject) => {
+		watcher.on(ERROR, reject)
+		checker.on(ERROR, reject)
+
+		checker.once(UPDATE, resolve)
+
+		fs.copySync(source(src, 'tsconfig.js'), target('tsconfig.js'))
+		setTimeout(() => reject('file was not rebuilt within 500ms') , 500)
+	})
+	.finally(() => {
+		watcher.close()
+		checker.close()
+	})
+
+	return new Promise(r => setTimeout(r, 500)).then(() => t.pass())
+})
+
+test.serial('watcher does not build dependency', async t => {
+	const {
+		source,
+	} = prepare('base')
+
+	prepare('watch')
+
+	fs.copySync(
+		source(src, 'sub', 'tsconfig.js'),
+		target('sub', 'tsconfig.js')
+	)
+
+	const watcher = tsconfig.watch(target('sub'))
+	await new Promise((resolve, reject) => {
+		watcher.on(ERROR, reject)
+		watcher.on(READY, resolve)
+	})
+
+	const checker = chokidar.watch(target('tsconfig.json'))
+	await new Promise((resolve, reject) => {
+		checker.on(ERROR, reject)
+		checker.on(READY, resolve)
+	})
+
+	await new Promise((resolve, reject) => {
+		watcher.on(ERROR, reject)
+		checker.on(ERROR, reject)
+
+		checker.once(CREATE, () => reject('file was wrongfully built'))
+
+		fs.copySync(source(src, 'tsconfig.js'), target('tsconfig.js'))
+		setTimeout(resolve , 500)
+	})
+	.finally(() => {
+		watcher.close()
+		checker.close()
+	})
 
 	t.pass()
 })
@@ -155,12 +262,12 @@ test.serial('watcher removes json files when respective js files are deleted', a
 // Error Handling
 
 
-test.serial('rejects on error', async t => {
+test.serial('rejects on error', t => {
 	const {
 		run,
 	} = prepare('error')
 
-	await t.throwsAsync(() => run())
+	return t.throwsAsync(() => run())
 })
 
 
@@ -173,9 +280,9 @@ test.serial('watcher emits errors', async t => {
 
 	t.assert(
 		await new Promise((resolve, reject) => {
-			watcher.on('error', resolve)
+			watcher.on(ERROR, resolve)
 
-			watcher.on('ready', () =>
+			watcher.on(READY, () =>
 				setTimeout(() => {
 					reject('no error event emitted within 500ms')
 				}, 500)
@@ -205,14 +312,14 @@ function sample (label, namespace, ignore) {
 
 		const watcher = watch(ignore)
 		await new Promise((resolve, reject) => {
-			watcher.on('error', reject)
-			watcher.on('ready', ()=>watcher.close())
-			watcher.on('ready', resolve)
+			watcher.on(ERROR, reject)
+			watcher.on(READY, ()=>watcher.close())
+			watcher.on(READY, resolve)
 		})
 
 		await new Promise(r => setTimeout(r, 500))
 
-		await checkFiles(source, t)
+		return checkFiles(source, t)
 	})
 }
 

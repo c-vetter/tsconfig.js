@@ -3,122 +3,141 @@ const fs = require('fs-extra')
 
 const extractDependencies = require('./extract-dependencies')
 const make = require('./make')
-const resolvePath = require('./resolve-path')
 const watch = require('./watcher')
+
+const {
+	ERROR,
+
+	CREATE_TARGET, CREATE_DEPENDENCY,
+	UPDATE_TARGET, UPDATE_DEPENDENCY,
+	DELETE_TARGET, DELETE_DEPENDENCY,
+} = require('./events')
+
 
 module.exports = tsconfigWatch
 
 function tsconfigWatch (root, ignore=[]) {
-	const watcher = watch(root, ignore)
+	const watcher = watch({root, ignore, dependencies: true})
 
 	const dependenciesMap = new DepGraph()
 
 	let _queue = Promise.resolve()
 	const queue = (action) => { _queue = _queue.then(action) }
 
-	const emitError = e => watcher.emit('error', e)
-	watcher.on('add', file => queue(() => add(file).catch(emitError)))
-	watcher.on('change', file => queue(() => update(file).catch(emitError)))
-	watcher.on('unlink', file => queue(() => remove(file).catch(emitError)))
+	const emitError = e => watcher.emit(ERROR, e)
+
+	watcher.on(CREATE_TARGET, file => queue(() => (
+		add(file, true)
+		.then(() => build(file))
+		.catch(emitError)
+	)))
+	watcher.on(UPDATE_TARGET, file => queue(() => (
+		build(file)
+		.catch(emitError)
+	)))
+	watcher.on(DELETE_TARGET, file => queue(() => (
+		build(file)
+		.then(() => remove(file, true))
+		.catch(emitError)
+	)))
+
+	watcher.on(CREATE_DEPENDENCY, file => queue(() => (
+		add(file)
+		.then(() => build(file))
+		.catch(emitError)
+	)))
+	watcher.on(UPDATE_DEPENDENCY, file => queue(() => (
+		build(file)
+		.catch(emitError)
+	)))
+	watcher.on(DELETE_DEPENDENCY, file => queue(() => (
+		build(file)
+		.then(() => remove(file))
+		.catch(emitError)
+	)))
 
 	return watcher
 
 
 	// Event Handlers
 
-	async function add (file) {
-		const filepath = await resolvePath(file)
-		const data = { clear: removeDependency.bind(null, filepath) }
-
-		if (dependenciesMap.hasNode(filepath)) {
-			dependenciesMap.setNodeData(filepath, data)
-		} else {
-			dependenciesMap.addNode(filepath, data)
+	async function add(filepath, buildable) {
+		const data = {
+			buildable,
 		}
 
-		await updateDependencies(filepath)
-		return build(filepath)
+		dependenciesMap.addNode(filepath, data)
+
+		// in case the node has already been added as a dependency
+		if (buildable) {
+			// override data
+			dependenciesMap.setNodeData(filepath, data)
+			// don't watch redundantly
+			watcher.clearDependency(filepath)
+		}
 	}
 
-	async function update(file) {
-		const filepath = await resolvePath(file)
-		await updateDependencies(filepath)
-		return build(filepath)
+	async function remove(filepath, buildable) {
+		if (buildable) {
+			await fs.remove(`${filepath}on`)
+		}
+
+		const dependencies = dependenciesMap.dependenciesOf(filepath)
+		dependenciesMap.removeNode(filepath)
+
+		return Promise.all(
+			dependencies
+			.filter(dependency => dependenciesMap.dependantsOf(dependency).length === 0)
+			.filter(dependency => !dependenciesMap.getNodeData(dependency).buildable)
+			.map(dependency => remove(dependency))
+		)
 	}
-
-	async function remove(file) {
-		const filepath = await resolvePath(file)
-
-		dependenciesMap.getNodeData(filepath).clear()
-
-		return fs.remove(`${filepath}on`)
-	}
-
 
 	// Helpers
 
 	async function build (filepath) {
-		return Promise.all(
+		return updateDependencies(filepath)
+		.then(() => Promise.all(
 			[filepath]
 			.concat(dependenciesMap.dependantsOf(filepath))
 			.map(fp => delete require.cache[fp] && fp)
-			// two-step process so as to first clear all cache entries, then make all files
-			.map(make)
-		)
-	}
-
-	async function unwatchDependency (filepath) {
-		removeDependency(filepath)
-
-		if (dependenciesMap.dependantsOf(filepath).length === 0) {
-			watcher.unwatch(filepath)
-		}
-	}
-
-	function removeDependency (filepath) {
-		const dependencies = dependenciesMap.dependenciesOf(filepath)
-		dependenciesMap.removeNode(filepath)
-
-		dependencies.forEach(dependency => {
-			if (!dependenciesMap.hasNode(dependency)) {
-				return
-			}
-
-			if (dependenciesMap.dependantsOf(dependency).length === 0) {
-				dependenciesMap.getNodeData(dependency).clear()
-			}
-		})
+			.filter(fp => dependenciesMap.getNodeData(fp).buildable)
+			.filter(fp => fs.existsSync(fp))
+			.map(fp => make(fp))
+		))
 	}
 
 	async function updateDependencies (filepath) {
-		delete require.cache[filepath]
-
-		const directDependencies = (await extractDependencies(filepath)) || []
+		const directDependencies = extractDependencies(filepath) || []
 		const transitiveDependencies = dependenciesMap.dependenciesOf(filepath)
-
 		const extraDependencies = transitiveDependencies.filter(d => !directDependencies.includes(d))
+
 		extraDependencies.forEach(dependency => {
+			// does not touch deep dependencies, therefore clears obsolete direct dependencies
 			dependenciesMap.removeDependency(filepath, dependency)
 
 			if (dependenciesMap.dependantsOf(dependency).length === 0) {
-				dependenciesMap.getNodeData(dependency).clear()
+				watcher.clearDependency(dependency)
+
+				if (!dependenciesMap.getNodeData(dependency).buildable) {
+					dependenciesMap.removeNode(dependency)
+				}
 			}
 		})
 
 		const newDependecies = directDependencies.filter(d => !transitiveDependencies.includes(d))
 
 		return Promise.all(newDependecies.map(async dependency => {
-			if (!dependenciesMap.hasNode(dependency)) {
-				const data = { clear: unwatchDependency.bind(null, filepath) }
-
-				dependenciesMap.addNode(dependency, data)
-
-				await updateDependencies(dependency)
-				watcher.add(dependency)
+			if (dependenciesMap.hasNode(dependency)) {
+				dependenciesMap.addDependency(filepath, dependency)
+				return
 			}
 
+			add(dependency)
 			dependenciesMap.addDependency(filepath, dependency)
+			watcher.addDependency(dependency)
 
+			return updateDependencies(dependency)
 		}))
 	}
 }

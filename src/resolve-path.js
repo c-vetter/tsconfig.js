@@ -1,6 +1,6 @@
 const path = require('path')
 
-module.exports = async function resolvePath (...segments) {
+module.exports = function resolvePath (...segments) {
 	const filepath = path.resolve(...segments)
 
 	try {
