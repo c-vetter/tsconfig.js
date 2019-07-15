@@ -6,7 +6,7 @@ const fs = require('fs-extra')
 const readdirp = require('readdirp')
 const test = require('ava')
 
-const tsconfig = require('.')
+const tsconfig = require('..')
 
 const {
 	ERROR,
@@ -14,7 +14,7 @@ const {
 	CREATE,
 	UPDATE,
 	DELETE,
-} = require('./src/events')
+} = require('../src/events')
 
 const targetDirectory = '__tmp__'
 const baseFor = p => path.join(path.dirname(p), path.basename(p))
