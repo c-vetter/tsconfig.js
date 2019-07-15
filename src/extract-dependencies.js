@@ -9,11 +9,11 @@ module.exports = extractDependencies
 function extractDependencies (filepath) {
 	try {
 		const dependencies = []
-		const content = fs.readFileSync((resolvePath(filepath))).toString()
+		const content = fs.readFileSync(resolvePath(filepath)).toString()
 
 		let match
 		while(match = matcher.exec(content)) {
-			dependencies.push(resolvePath(filepath, '..', match[2]))
+			dependencies.push(resolvePath(match[2], filepath))
 		}
 
 		return dependencies

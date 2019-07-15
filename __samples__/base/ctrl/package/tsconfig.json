@@ -1,0 +1,11 @@
+{
+  "extends": "./common",
+
+  "compilerOptions": {
+    "lib": ["es2018"],
+
+    "types": ["node"],
+
+    "resolveJsonModule": true
+  }
+}
