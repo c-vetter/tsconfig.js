@@ -1,6 +1,6 @@
 {
   "name": "tsconfig.js",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "description": "Polyfill for tsconfig.js, because TypeScript does not natively support JS config files",
   "main": "index.js",
   "bin": "cli.js",

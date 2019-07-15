@@ -16,13 +16,16 @@ const {
 	DELETE,
 } = require('./src/events')
 
+const targetDirectory = '__tmp__'
 const baseFor = p => path.join(path.dirname(p), path.basename(p))
 const mapToBasePaths = entry => entry.map(({path}) => baseFor(path))
-const target = (...segments) => path.join('__tmp__', ...segments)
+const target = (...segments) => path.join(targetDirectory, ...segments)
 
 
 const src = 'src'
 const ctrl = 'ctrl'
+const jsFile = 'tsconfig.js'
+const jsonFile = 'tsconfig.json'
 
 
 // Interface
@@ -37,59 +40,90 @@ test.serial('simple call returns a Promise', t => {
 	return promise
 })
 
-test.serial('simple call requires a base path', t => {
-	clean()
-
-	return t.throwsAsync(() => tsconfig())
-})
-
 test.serial('watch call returns a closable EventEmitter', t => {
 	clean()
 
-	;[
-		tsconfig.watch(),
-		tsconfig.watch(target()),
-	].forEach(eventEmitter => {
-		t.assert(eventEmitter instanceof EventEmitter)
+	const eventEmitter = tsconfig.watch(target())
 
-		eventEmitter.on(ERROR, ()=>{})
+	t.assert(eventEmitter instanceof EventEmitter)
 
-		try {
-			t.assert(eventEmitter.close, 'missing `close` method')
+	try {
+		t.assert(eventEmitter.close, 'missing `close` method')
 
-			eventEmitter.close()
-		} catch(error) {
-			eventEmitter.removeAllListeners()
+		eventEmitter.close()
+	} catch(error) {
+		eventEmitter.removeAllListeners()
 
-			throw error
-		}
-	})
+		throw error
+	}
 })
 
-test.serial('watch call requires a base path', async t => {
-	clean()
+test.serial('simple call defaults to current working directory', async t => {
+	prepare('simple')
 
-	const error = await new Promise((resolve, reject) => {
+	const cwd = process.cwd()
+
+	const checker = chokidar.watch(jsonFile, { cwd: __dirname })
+	await new Promise((resolve, reject) => {
+		checker.on(ERROR, reject)
+		checker.on(READY, resolve)
+	})
+
+	await new Promise((resolve, reject) => {
+		checker.on(ERROR, reject)
+		checker.on(CREATE, (fp) => {
+			if (!fp.includes(targetDirectory)) reject('file outside current working directory was built')
+		})
+
+		process.chdir(targetDirectory)
+
+		return tsconfig()
+		.then(resolve)
+		.catch(reject)
+	})
+	.finally(() => {
+		process.chdir(cwd)
+		checker.close()
+	})
+
+	t.assert(fs.existsSync(target(jsonFile)))
+})
+
+test.serial('watch call defaults to current working directory', async t => {
+	prepare('simple')
+
+	const cwd = process.cwd()
+
+	const checker = chokidar.watch(jsonFile, { cwd: __dirname })
+	await new Promise((resolve, reject) => {
+		checker.on(ERROR, reject)
+		checker.on(READY, resolve)
+	})
+
+	await new Promise((resolve, reject) => {
+		checker.on(ERROR, reject)
+		checker.on(CREATE, (fp) => {
+			if (!fp.includes(targetDirectory)) reject(`file outside current working directory was built: ${fp}`)
+		})
+
+		process.chdir(targetDirectory)
+
 		const watcher = tsconfig.watch()
-		watcher.on(ERROR, resolve)
-
-		setTimeout(() => {
+		watcher.on(ERROR, error => {
 			watcher.close()
-			reject('no error event emitted within 500ms')
-		}, 500)
+			reject(error)
+		})
+		watcher.on(READY, () => {
+			watcher.close()
+			setTimeout(resolve, 500)
+		})
+	})
+	.finally(() => {
+		process.chdir(cwd)
+		checker.close()
 	})
 
-	t.assert(error)
-
-	return new Promise((resolve, reject) => {
-		const watcher = tsconfig.watch(target())
-		watcher.on(ERROR, reject)
-
-		setTimeout(() => {
-			watcher.close()
-			resolve()
-		}, 1000)
-	})
+	t.assert(fs.existsSync(target(jsonFile)))
 })
 
 
@@ -100,7 +134,11 @@ sample('builds json files properly', 'base')
 sample('overwrites pre-existing json file if js file present', 'overwrite')
 sample('leaves out invalid files', 'guard')
 sample('leaves out undesired files', 'guard-custom', ['**/sub'])
-sample('does not build dependencies', 'dependencies', path.resolve(target('tsconfig.js')))
+sample('ignores directories and files', 'ignore', [
+	path.resolve(target('ignore-directory')),
+	path.resolve(target('ignore-file', jsFile)),
+])
+sample('does not build dependencies', 'dependencies', path.resolve(target(jsFile)))
 
 
 test.serial('watcher updates json files when respective js files are changed', async t => {
@@ -141,7 +179,7 @@ test.serial('watcher removes json files when respective js files are deleted', a
 		watcher.on(READY, resolve)
 	})
 
-	const checker = chokidar.watch(target('**', 'tsconfig.json').replace(/\\/g, '/'))
+	const checker = chokidar.watch(target('**', jsonFile).replace(/\\/g, '/'))
 	await new Promise((resolve, reject) => {
 		checker.on(ERROR, reject)
 		checker.on(READY, resolve)
@@ -154,7 +192,7 @@ test.serial('watcher removes json files when respective js files are deleted', a
 		checker.once(DELETE, () => {
 			checker.once(DELETE, resolve)
 
-			fs.removeSync(target('tsconfig.js'))
+			fs.removeSync(target(jsFile))
 
 			setTimeout(() => {
 				reject('json file was not removed within 500ms')
@@ -183,8 +221,8 @@ test.serial('watcher triggers rebuild from dependency', async t => {
 	prepare('watch')
 
 	fs.copySync(
-		source(src, 'sub', 'tsconfig.js'),
-		target('sub', 'tsconfig.js')
+		source(src, 'sub', jsFile),
+		target('sub', jsFile)
 	)
 
 
@@ -194,7 +232,7 @@ test.serial('watcher triggers rebuild from dependency', async t => {
 		watcher.on(READY, resolve)
 	})
 
-	const checker = chokidar.watch(target('sub', 'tsconfig.json'))
+	const checker = chokidar.watch(target('sub', jsonFile))
 	await new Promise((resolve, reject) => {
 		checker.on(ERROR, reject)
 		checker.on(READY, resolve)
@@ -206,7 +244,7 @@ test.serial('watcher triggers rebuild from dependency', async t => {
 
 		checker.once(UPDATE, resolve)
 
-		fs.copySync(source(src, 'tsconfig.js'), target('tsconfig.js'))
+		fs.copySync(source(src, jsFile), target(jsFile))
 		setTimeout(() => reject('file was not rebuilt within 500ms') , 500)
 	})
 	.finally(() => {
@@ -225,8 +263,8 @@ test.serial('watcher does not build dependency', async t => {
 	prepare('watch')
 
 	fs.copySync(
-		source(src, 'sub', 'tsconfig.js'),
-		target('sub', 'tsconfig.js')
+		source(src, 'sub', jsFile),
+		target('sub', jsFile)
 	)
 
 	const watcher = tsconfig.watch(target('sub'))
@@ -235,7 +273,7 @@ test.serial('watcher does not build dependency', async t => {
 		watcher.on(READY, resolve)
 	})
 
-	const checker = chokidar.watch(target('tsconfig.json'))
+	const checker = chokidar.watch(target(jsonFile))
 	await new Promise((resolve, reject) => {
 		checker.on(ERROR, reject)
 		checker.on(READY, resolve)
@@ -247,7 +285,7 @@ test.serial('watcher does not build dependency', async t => {
 
 		checker.once(CREATE, () => reject('file was wrongfully built'))
 
-		fs.copySync(source(src, 'tsconfig.js'), target('tsconfig.js'))
+		fs.copySync(source(src, jsFile), target(jsFile))
 		setTimeout(resolve , 500)
 	})
 	.finally(() => {
@@ -363,7 +401,7 @@ function checkFiles (source, t) {
 
 function collectPaths (source) {
 	const collect = what => readdirp.promise(what, {
-		fileFilter: ['tsconfig.json'],
+		fileFilter: [jsonFile],
 	})
 	.then(mapToBasePaths)
 

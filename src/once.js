@@ -10,7 +10,7 @@ const {
 
 module.exports = tsconfig
 
-function tsconfig (root, ignore=[]) {
+function tsconfig (root = '.', ignore=[]) {
 	return new Promise((resolve, reject) => {
 		const watcher = watch({root, ignore})
 		watcher.on(ERROR, reject)
