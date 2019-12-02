@@ -1,11 +1,8 @@
 {
-  "extends": "./common",
+  "extends": "./_private/module",
 
   "compilerOptions": {
-    "lib": ["es2018"],
-
-    "types": ["node"],
-
-    "resolveJsonModule": true
+    "lib": ["ESNext"],
+    "module": "CommonJS"
   }
 }

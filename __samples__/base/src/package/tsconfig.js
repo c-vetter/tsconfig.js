@@ -1,1 +1,1 @@
-module.exports = require('tsconfigs/node')
+module.exports = require('tsconfigs/nodejs-module')
