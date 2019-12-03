@@ -1,5 +1,3 @@
-const path = require('path')
-
 const EventEmitter = require('events')
 const chokidar = require('chokidar')
 
@@ -15,19 +13,7 @@ const {
 } = require('./events')
 
 
-module.exports = function watch({root, ignore, dependencies}) {
-	if (!root) {
-		const deadEnd = new EventEmitter()
-		deadEnd.close = ()=>{}
-
-		setImmediate(() => deadEnd.emit(
-			ERROR,
-			new Error('you need to provide the base path for tsconfig.js to work')
-		))
-
-		return deadEnd
-	}
-
+module.exports = function watch({ root = '.', ignore = [] }, watchDependencies = false) {
 	if (!Array.isArray(ignore)) {
 		ignore = [ignore]
 	}
@@ -51,7 +37,7 @@ module.exports = function watch({root, ignore, dependencies}) {
 	buildWatcher.on(UPDATE, file => external.emit(UPDATE_TARGET, resolvePath(file)))
 	buildWatcher.on(DELETE, file => external.emit(DELETE_TARGET, resolvePath(file)))
 
-	if (dependencies) {
+	if (watchDependencies) {
 		const dependencyWatcher = chokidar.watch()
 
 		dependencyWatcher.on(ERROR, error => external.emit(ERROR, error))

@@ -1,10 +1,26 @@
 const fs = require('fs-extra')
 
-module.exports = function make(filepath) {
+module.exports = function make(filepath, options = {}) {
+	const tsconfig = require(filepath)
+
+	switch (options.extends) {
+		case 'drop-any':
+			delete tsconfig.extends
+		break;
+
+		case 'drop-relative':
+			if (tsconfig.extends.startsWith('.')) {
+				delete tsconfig.extends
+			}
+		break;
+
+		// no default
+	}
+
 	try {
 		return fs.writeJson(
 			`${filepath}on`,
-			require(filepath)
+			tsconfig
 		)
 	} catch (e) {
 		e.stack = `Error: ${e.message}\n    at ${filepath}`

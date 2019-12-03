@@ -16,8 +16,8 @@ const {
 
 module.exports = tsconfigWatch
 
-function tsconfigWatch (root = '.', ignore=[]) {
-	const watcher = watch({root, ignore, dependencies: true})
+function tsconfigWatch (options) {
+	const watcher = watch(options, true)
 
 	const dependenciesMap = new DepGraph()
 

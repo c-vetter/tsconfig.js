@@ -4,7 +4,7 @@ const EventEmitter = require('events')
 const chokidar = require('chokidar')
 const fs = require('fs-extra')
 const readdirp = require('readdirp')
-const test = require('ava')
+const test = require('ava').serial
 
 const tsconfig = require('..')
 
@@ -31,7 +31,7 @@ const jsonFile = 'tsconfig.json'
 // Interface
 
 
-test.serial('simple call returns a Promise', t => {
+test('simple call returns a Promise', t => {
 	clean()
 
 	const promise = tsconfig(target())
@@ -40,7 +40,7 @@ test.serial('simple call returns a Promise', t => {
 	return promise
 })
 
-test.serial('watch call returns a closable EventEmitter', t => {
+test('watch call returns a closable EventEmitter', t => {
 	clean()
 
 	const eventEmitter = tsconfig.watch(target())
@@ -58,7 +58,7 @@ test.serial('watch call returns a closable EventEmitter', t => {
 	}
 })
 
-test.serial('simple call defaults to current working directory', async t => {
+test('simple call defaults to current working directory', async t => {
 	prepare('simple')
 
 	const cwd = process.cwd()
@@ -89,7 +89,7 @@ test.serial('simple call defaults to current working directory', async t => {
 	t.assert(fs.existsSync(target(jsonFile)))
 })
 
-test.serial('watch call defaults to current working directory', async t => {
+test('watch call defaults to current working directory', async t => {
 	prepare('simple')
 
 	const cwd = process.cwd()
@@ -141,7 +141,21 @@ sample('ignores directories and files', 'ignore', [
 sample('does not build dependencies', 'dependencies', target(jsFile))
 
 
-test.serial('watcher updates json files when respective js files are changed', async t => {
+test('handles `extends` as per given option', async t => {
+	const {
+		run,
+		source,
+	} = prepare('extends')
+
+	await run({ignore: ['drop-any', 'drop-relative']})
+	await run({root: target('drop-any'), extends: 'drop-any'})
+	await run({root: target('drop-relative'), extends: 'drop-relative'})
+
+	return checkFiles(source, t)
+})
+
+
+test('watcher updates json files when respective js files are changed', async t => {
 	const {
 		source,
 		watch,
@@ -168,7 +182,7 @@ test.serial('watcher updates json files when respective js files are changed', a
 })
 
 
-test.serial('watcher removes json files when respective js files are deleted', async t => {
+test('watcher removes json files when respective js files are deleted', async t => {
 	const {
 		watch,
 	} = prepare('watch')
@@ -213,7 +227,7 @@ test.serial('watcher removes json files when respective js files are deleted', a
 })
 
 
-test.serial('watcher triggers rebuild from dependency', async t => {
+test('watcher triggers rebuild from dependency', async t => {
 	const {
 		source,
 	} = prepare('base')
@@ -255,7 +269,7 @@ test.serial('watcher triggers rebuild from dependency', async t => {
 	return new Promise(r => setTimeout(r, 500)).then(() => t.pass())
 })
 
-test.serial('watcher does not build dependency', async t => {
+test('watcher does not build dependency', async t => {
 	const {
 		source,
 	} = prepare('base')
@@ -300,7 +314,7 @@ test.serial('watcher does not build dependency', async t => {
 // Error Handling
 
 
-test.serial('rejects on error', t => {
+test('rejects on error', t => {
 	const {
 		run,
 	} = prepare('error')
@@ -309,7 +323,7 @@ test.serial('rejects on error', t => {
 })
 
 
-test.serial('watcher emits errors', async t => {
+test('watcher emits errors', async t => {
 	const {
 		watch,
 	} = prepare('error')
@@ -335,20 +349,20 @@ test.serial('watcher emits errors', async t => {
 
 
 function sample (label, namespace, ignore) {
-	test.serial(label, async t => {
+	test(label, async t => {
 		const {
 			run,
 			source,
 		} = prepare(namespace)
 
-		await run(ignore)
+		await run({ignore})
 		await checkFiles(source, t)
 
 		const {
 			watch,
 		} = prepare(namespace)
 
-		const watcher = watch(ignore)
+		const watcher = watch({ignore})
 		await new Promise((resolve, reject) => {
 			watcher.on(ERROR, reject)
 			watcher.on(READY, ()=>watcher.close())
@@ -367,8 +381,8 @@ function prepare (namespace, keep=false) {
 	keep || clean()
 	fs.copySync(source(src), target())
 
-	const run = (ignore) => tsconfig(target(), ignore)
-	const watch = (ignore) => tsconfig.watch(target(), ignore)
+		const run = (options) => tsconfig({ root: target(), ...options })
+		const watch = (options) => tsconfig.watch({ root: target(), ...options })
 
 	return {
 		run,

@@ -10,14 +10,14 @@ const {
 
 module.exports = tsconfig
 
-function tsconfig (root = '.', ignore=[]) {
+function tsconfig (options) {
 	return new Promise((resolve, reject) => {
-		const watcher = watch({root, ignore})
+		const watcher = watch(options)
 		watcher.on(ERROR, reject)
 
 		const all = []
 
-		watcher.on(FIND, file => all.push(build(file).catch(reject)))
+		watcher.on(FIND, file => all.push(build(file, options).catch(reject)))
 		watcher.on(READY, () => watcher.close())
 
 		watcher.on(READY, () =>
@@ -26,9 +26,9 @@ function tsconfig (root = '.', ignore=[]) {
 	})
 }
 
-async function build (filepath) {
+async function build (filepath, options) {
 	clearCache(filepath)
-	return make(filepath)
+	return make(filepath, options)
 }
 
 function clearCache (filepath) {

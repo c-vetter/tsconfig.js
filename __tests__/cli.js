@@ -6,55 +6,114 @@ const [p1, p2, p3] = ['p1', 'p2', 'p3']
 
 
 test('no parameters', t => {
-	checkOptions(t, '', ['.', []])
+	checkOptions(t, '', { ignore: [] })
 })
 
 test('positional parameters', t => {
 	checkOptions(t,
 		'p1 p2 p3',
-		['.', [p1, p2, p3]]
+		{
+			ignore: [p1, p2, p3],
+		}
 	)
 })
 
 test('root parameter', t => {
 	checkOptions(t,
 		'--root p1 p2 p3',
-		[p1, [p2, p3]]
+		{
+			root: p1,
+			ignore: [p2, p3],
+		}
 	)
 
 	checkOptions(t,
 		'p1 --root p2 p3',
-		[p2, [p1, p3]]
+		{
+			root: p2,
+			ignore: [p1, p3],
+		}
 	)
 
 	checkOptions(t,
 		'p1 p2 --root p3',
-		[p3, [p1, p2]]
+		{
+			root: p3,
+			ignore: [p1, p2],
+		}
 	)
 })
 
-function checkOptions (t, input, argsExpected) {
-	let args
+test('extends parameter', t => {
+	checkOptions(t,
+		'--extends p1 p2 p3',
+		{
+			extends: p1,
+			ignore: [p2, p3],
+		}
+	)
+
+	checkOptions(t,
+		'p1 --extends p2 p3',
+		{
+			extends: p2,
+			ignore: [p1, p3],
+		}
+	)
+
+	checkOptions(t,
+		'p1 p2 --extends p3',
+		{
+			extends: p3,
+			ignore: [p1, p2],
+		}
+	)
+})
+
+test('all parameters', t => {
+	checkOptions(t,
+		'p1 --root root p2 --extends ext p3',
+
+		{
+			root: 'root',
+			extends: 'ext',
+			ignore: [p1, p2, p3],
+		}
+	)
+
+	checkOptions(t,
+		'p1 --extends ext p2 --root root p3',
+
+		{
+			root: 'root',
+			extends: 'ext',
+			ignore: [p1, p2, p3],
+		}
+	)
+})
+
+function checkOptions (t, input, optionsExpected) {
+	let options
 
 	prepare(input)
 	proxyquire('../cli.js', {
-		'.': (...a) => {
-			args = a
+		'.': o => {
+			options = o
 			return { catch() {} }
 		}
 	})
-	t.deepEqual(args, argsExpected)
+	t.deepEqual(options, optionsExpected)
 
 	prepare(input, true)
 	proxyquire('../cli.js', {
 		'.': {
-			watch: (...a) => {
-				args = a
+			watch: o => {
+				options = o
 				return { on() {} }
 			}
 		}
 	})
-	t.deepEqual(args, argsExpected)
+	t.deepEqual(options, optionsExpected)
 }
 
 function prepare(input, watch) {

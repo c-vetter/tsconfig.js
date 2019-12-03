@@ -16,6 +16,7 @@ Enables using `tsconfig.js` files instead of `tsconfig.json` files with all the 
 + [How to use it](#how-to-use-it)
 	+ [node API](#node-api)
 	+ [CLI](#cli)
++ [Changelog](#changelog)
 
 
 ----
@@ -87,9 +88,15 @@ If that is unreliable as well, you may be stuck with using JSON files until the 
 ## node API
 You can import either `tsconfig.js` or `tsconfig.js/watch`, depending on how you will use it.
 
-Both take the same two options:
-+ `root`: a directory path at which to start looking for `tsconfig.js` files
+Both take an object of options as the only argument, with these fields:
++ `root`: a directory path at which to start looking for `tsconfig.js` files, will be resolved, defaults to '.'
 + `ignore`: an array of paths to ignore
++ `extends`: a string determining the strategy to use for the `extends` field:
+	+ `"drop-relative"` (recommended): removes all relative paths. Relative paths from imported configs cannot work, so they should be dropped. This is not the default for backwards compatibility
+	+ `"drop-any"`: If you don't care about extending at all, you can just drop this altogether
+	+ `"ignore"` (default): do nothing
+
+> [NOTE] For backwards compatibility, you can give `root` as first and `ignore` as the second parameter: `tsconfigJs('src', ['src/legacy'])`
 
 `tsconfig.js` returns a `Promise` that resolves when all `tsconfig.js` have been converted.
 `tsconfig.js/watch` returns an `EventEmitter` that you can call `close` on to stop watching.
@@ -110,23 +117,42 @@ This reads any `tsconfig.js` files found in the current working directory and it
 ```js
 const tsconfigJs = require('tsconfig.js')
 
-tsconfigJs('src', [
-	'src/legacy',
-	'src/tsconfig.js', // only a dependency
-])
+tsconfigJs({
+	root: 'src',
+	extends: 'drop-relative',
+	ignore: [
+		'src/legacy',
+		'src/tsconfig.js', // only a dependency
+	],
+})
 ```
 
 This reads any `tsconfig.js` files found in `./src/` and its sub-directories, then writes the equivalent `tsconfig.json` files.
 It ignores the specific file `src/tsconfig.js` as well as any `tsconfig.js` files within `src/legacy`.
+Also, the `extends` field in the resulting `tsconfig.json` is dropped if relative.
 
 
 ## CLI
 ```bash
-npx tsconfig.js [--no-watch] [--root src] [src/ignored-file/tsconfig.js].. [src/ignored-directory/]..
+npx tsconfig.js [--no-watch] [--extends strategy] [--root src] [src/ignored-file/tsconfig.js].. [src/ignored-directory/]..
 ```
 
 By default, the watcher is used, but setting `--no-watch` has `tsconfig.js` run only once.
 
+The `--extends` argument sets the strategy for dealing with `extends`, valid values: `drop-any`, `drop-relative`. `ignore`
+
 The `--root` argument sets the root directory.
 
 The other arguments are passed to the underlying node API as an array, signifying the ignore-paths.
+
+
+# Changelog
+
+## [1.1.0]
++	node API switched to options object, positional parameters deprecated
++	new `extends` option
+
+## [1.0.0]
++	builds `tsconfig.json` from `tsconfig.js`
++	walks down filesystem to find all `tsconfig.js` files in given scope
++	watches for changes, including `require`d files
