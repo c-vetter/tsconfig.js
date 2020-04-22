@@ -28,7 +28,7 @@ test('root parameter', t => {
 	)
 
 	checkOptions(t,
-		'p1 --root p2 p3',
+		'p1 --root=p2 p3',
 		{
 			root: p2,
 			ignore: [p1, p3],
@@ -46,7 +46,7 @@ test('root parameter', t => {
 
 test('extends parameter', t => {
 	checkOptions(t,
-		'--extends p1 p2 p3',
+		'--extends=p1 p2 p3',
 		{
 			extends: p1,
 			ignore: [p2, p3],
@@ -62,7 +62,7 @@ test('extends parameter', t => {
 	)
 
 	checkOptions(t,
-		'p1 p2 --extends p3',
+		'p1 p2 --extends=p3',
 		{
 			extends: p3,
 			ignore: [p1, p2],
@@ -90,14 +90,36 @@ test('all parameters', t => {
 			ignore: [p1, p2, p3],
 		}
 	)
+
+	checkOptions(t,
+		'--comment --extends=ext --extensions=ext1,ext2,ext3 --root=root -- p1 p2 p3',
+
+		{
+			root: 'root',
+			comment: true,
+			extends: 'ext',
+			extensions: ['ext1', 'ext2', 'ext3'],
+			ignore: [p1, p2, p3],
+		}
+	)
 })
 
-function checkOptions (t, input, optionsExpected) {
+function checkOptions (t, input, optionsRequired) {
+	const optionsExpected = {
+		comment: false,
+		extends: undefined,
+		extensions: ['js'],
+		ignore: [],
+		root: undefined,
+
+		...optionsRequired,
+	}
 	let options
 
+
 	prepare(input)
-	proxyquire('../cli.js', {
-		'.': o => {
+	require('proxyquire').noCallThru()('../cli.js', {
+		'./src/once': o => {
 			options = o
 			return { catch() {} }
 		}
@@ -106,11 +128,9 @@ function checkOptions (t, input, optionsExpected) {
 
 	prepare(input, true)
 	proxyquire('../cli.js', {
-		'.': {
-			watch: o => {
-				options = o
-				return { on() {} }
-			}
+		'./src/watch': o => {
+			options = o
+			return { on() {} }
 		}
 	})
 	t.deepEqual(options, optionsExpected)

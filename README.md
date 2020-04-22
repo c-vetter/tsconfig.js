@@ -1,11 +1,6 @@
 # tsconfig.js
 Enables using `tsconfig.js` files instead of `tsconfig.json` files with all the benefits that brings.
 
-> **NOTE:**
-> Under the hood, this uses `chokidar`.
-> Unfortunately, that results in directories starting with a dot `.` not being captured.
-> There is [a ticket with chokidar concerning this issue](https://github.com/paulmillr/chokidar/issues/870).
-
 
 + [What it is](#what-it-is)
 	+ [Why it exists](#why-it-exists)
@@ -55,6 +50,8 @@ This package offers a recommended watch mode for close-to-seemless operation, as
 
 In order to be as seemless as possible, the `tsconfig.js` watcher builds a dependency map of your config files and rebuilds the targeted config files as needed.
 
+Starting with v1.2.0, you can use transpilable source types like TypeScript. This is based on [interpret][]. Therefore, you can use the same types as for [webpack](https://webpack.js.org/configuration/configuration-languages/). This is opt-in via the `extensions` configuration. The rest of this document will talk of `tsconfig.js` files, but everything applies equally to `tsconfig.ts` files and the like.
+
 
 ## What it does not
 `tsconfig.js` does not:
@@ -67,7 +64,7 @@ In order to be as seemless as possible, the `tsconfig.js` watcher builds a depen
 ## When to use
 `tsconfig.js` is for you if you want to write configuration as JS files.
 
-This requires that ever member of your team be aware that your `tsconfig.js` files are where changes need to be made, not `tsconfig.json`.
+This requires that every member of your team be aware that your `tsconfig.js` files are where changes need to be made, not `tsconfig.json`.
 
 You also need to ensure one of these:
 + The watcher runs concurrently with your other build watchers (recommended for development)
@@ -91,14 +88,17 @@ You can import either `tsconfig.js` or `tsconfig.js/watch`, depending on how you
 Both take an object of options as the only argument, with these fields:
 + `root`: a directory path at which to start looking for `tsconfig.js` files, will be resolved, defaults to '.'
 + `ignore`: an array of paths to ignore
++ `comment`: if `true` (recommended), each `tsconfig.json` will include a comment indicating the source `tsconfig.js` file. Requires [TypeScript v1.8+](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-1-8.html#allow-comments-in-tsconfigjson). This is not the default for backwards compatibility
 + `extends`: a string determining the strategy to use for the `extends` field:
 	+ `"drop-relative"` (recommended): removes all relative paths. Relative paths from imported configs cannot work, so they should be dropped. This is not the default for backwards compatibility
 	+ `"drop-any"`: If you don't care about extending at all, you can just drop this altogether
 	+ `"ignore"` (default): do nothing
++ `extensions`: an array of extensions to process, defaults to `['js']`
+	+ requires `interpret` (see optional dependencies)
 
-> [NOTE] For backwards compatibility, you can give `root` as first and `ignore` as the second parameter: `tsconfigJs('src', ['src/legacy'])`
+> [NOTE] For backwards compatibility (v1.0), you can give `root` as first and `ignore` as the second parameter: `tsconfigJs('src', ['src/legacy'])`
 
-`tsconfig.js` returns a `Promise` that resolves when all `tsconfig.js` have been converted.
+`tsconfig.js` returns a `Promise` that resolves when all `tsconfig.js` files have been converted.
 `tsconfig.js/watch` returns an `EventEmitter` that you can call `close` on to stop watching.
 
 And that is it.
@@ -119,7 +119,12 @@ const tsconfigJs = require('tsconfig.js')
 
 tsconfigJs({
 	root: 'src',
+	comment: true,
 	extends: 'drop-relative',
+	extensions: [
+		'ts',
+		'json5',
+	],
 	ignore: [
 		'src/legacy',
 		'src/tsconfig.js', // only a dependency
@@ -127,26 +132,39 @@ tsconfigJs({
 })
 ```
 
-This reads any `tsconfig.js` files found in `./src/` and its sub-directories, then writes the equivalent `tsconfig.json` files.
-It ignores the specific file `src/tsconfig.js` as well as any `tsconfig.js` files within `src/legacy`.
+This reads any `tsconfig.ts` and `tsconfig.json5` files found in `./src/` and its sub-directories, then writes the equivalent `tsconfig.json` files.
+
+It ignores the specific file `src/tsconfig.js` as well as any `tsconfig.*` files within `src/legacy`.
+
 Also, the `extends` field in the resulting `tsconfig.json` is dropped if relative.
+
+Finally, every generated `tsconfig.json` will include a comment indicating its source.
 
 
 ## CLI
 ```bash
-npx tsconfig.js [--no-watch] [--extends strategy] [--root src] [src/ignored-file/tsconfig.js].. [src/ignored-directory/]..
+npx tsconfig.js [--no-watch] [--extends=strategy] [--root=src] [--extensions=ext,ext..] [-- [src/ignored-file/tsconfig.js].. [src/ignored-directory/]..]
 ```
 
 By default, the watcher is used, but setting `--no-watch` has `tsconfig.js` run only once.
+
+The `--comment` flag adds source comments to built `tsconfig.json` files.
 
 The `--extends` argument sets the strategy for dealing with `extends`, valid values: `drop-any`, `drop-relative`. `ignore`
 
 The `--root` argument sets the root directory.
 
+The `--extensions` argument takes the comma-separated list of extensions to look for. Remember to include `js` if applicable. Requires [interpret][] (see optional dependencies).
+
 The other arguments are passed to the underlying node API as an array, signifying the ignore-paths.
 
 
 # Changelog
+
+## [1.2.0]
++	custom extensions beyond `.js`
++	source comments
++	improved dependency acquisition
 
 ## [1.1.0]
 +	node API switched to options object, positional parameters deprecated
@@ -156,3 +174,8 @@ The other arguments are passed to the underlying node API as an array, signifyin
 +	builds `tsconfig.json` from `tsconfig.js`
 +	walks down filesystem to find all `tsconfig.js` files in given scope
 +	watches for changes, including `require`d files
+
+
+
+
+[interpret]: https://www.npmjs.com/package/interpret
