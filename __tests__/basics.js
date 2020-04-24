@@ -124,10 +124,10 @@ test('watch call defaults to current working directory', async t => {
 
 test('rejects on error', t => {
 	const {
-		run,
+		once,
 	} = prepare('error')
 
-	return t.throwsAsync(() => run())
+	return t.throwsAsync(() => once())
 })
 
 

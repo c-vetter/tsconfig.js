@@ -16,12 +16,14 @@ const src = 'src'
 const ctrl = 'ctrl'
 const jsFile = 'tsconfig.js'
 const jsonFile = 'tsconfig.json'
+const tsFile = 'tsconfig.ts'
 
 module.exports = {
 	prepare,
 	checkFiles,
 	jsFile,
 	jsonFile,
+	tsFile,
 	tsconfigOnce,
 	tsconfigWatch,
 }
@@ -29,8 +31,13 @@ module.exports = {
 function prepare (namespace, keep=false) {
 	keep || clean()
 
+	const once = (options) => tsconfigOnce({ root: target(), ...options })
+	const watch = (options) => tsconfigWatch({ root: target(), ...options })
+
 	if(!namespace) {
 		return {
+			once,
+			watch,
 			target,
 		}
 	}
@@ -40,11 +47,8 @@ function prepare (namespace, keep=false) {
 
 	fs.copySync(source(), target())
 
-	const run = (options) => tsconfigOnce({ root: target(), ...options })
-	const watch = (options) => tsconfigWatch({ root: target(), ...options })
-
 	return {
-		run,
+		once,
 		watch,
 		source,
 		target,

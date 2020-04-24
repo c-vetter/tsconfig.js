@@ -21,16 +21,31 @@ const {
 
 test('handles `extends` as per given option', async t => {
 	const {
-		run,
+		once,
 		target,
 		control,
 	} = prepare('extends')
 
-	await run({extends: 'drop-relative', root: target('drop-relative')})
-	await run({extends: 'drop-any', root: target('drop-any')})
-	await run({extends: 'ignore', root: target('ignore')})
+	await once({extends: 'drop-relative', root: target('drop-relative')})
+	await once({extends: 'drop-any', root: target('drop-any')})
+	await once({extends: 'ignore', root: target('ignore')})
 
 	return checkFiles(t, control)
+})
+
+test('throws if given extensions cannot be enabled', async t => {
+	const { once } = prepare()
+
+	await t.throwsAsync(() => once({ extensions: ['.ini'] }), {
+		instanceOf: Error,
+		message: /.ini/,
+	})
+})
+
+test('does not throw if given extension unknown', async t => {
+	const { once } = prepare()
+
+	await t.notThrowsAsync(() => once({ extensions: ['.js-compatible'] }))
 })
 
 

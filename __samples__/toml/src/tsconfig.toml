@@ -1,0 +1,3 @@
+[compilerOptions]
+module = "amd"
+"target" = "es5"

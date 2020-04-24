@@ -1,3 +1,5 @@
+const path = require('path')
+
 const fs = require('fs-extra')
 
 module.exports = make
@@ -5,27 +7,32 @@ module.exports = make
 function make(filepath, options = {}) {
 	const tsconfig = require(filepath)
 
-	switch (options.extends) {
-		case 'drop-any':
-			delete tsconfig.extends
-		break;
+	if (tsconfig.extends) {
+		switch (options.extends) {
+			case 'ignore': break
 
-		case 'drop-relative':
-			if (tsconfig.extends.startsWith('.')) {
+			case 'drop-any':
 				delete tsconfig.extends
-			}
-		break;
+			break
 
-		// no default
+			case 'drop-relative':
+			default:
+				if (tsconfig.extends.startsWith('.')) {
+					delete tsconfig.extends
+				}
+			break
+		}
 	}
 
 	try {
+		const { dir, name } = path.parse(filepath)
+
 		return fs.writeJson(
-			`${filepath}on`,
+			`${dir}/${name}.json`,
 			tsconfig
 		)
 	} catch (e) {
-		e.stack = `Error: ${e.message}\n    at ${filepath}`
+		e.stack = `Error: ${e.message}\n    at make(${filepath}, ${JSON.stringify(options)})`
 
 		throw e
 	}

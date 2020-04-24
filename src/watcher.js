@@ -13,22 +13,29 @@ const {
 } = require('./events')
 
 
-module.exports = function watch({ root = '.', ignore = [] }, watchDependencies = false) {
+module.exports = function watch({ root = '.', ignore = [], extensions = ['.js'] }, watchDependencies = false) {
+	if (extensions.length > 1 || extensions[0] !== '.js') {
+		require('./enable-extensions')(extensions)
+	}
+
 	if (!Array.isArray(ignore)) {
 		ignore = [ignore]
 	}
 
 	const external = new EventEmitter()
 
-	const buildWatcher = chokidar.watch(`${resolvePath(root).replace(/\\/g, '/')}/**/tsconfig.js`, {
-		ignoreInitial: false,
-		ignored: [
-			'**/.git',
-			'**/node_modules',
+	const buildWatcher = chokidar.watch(
+		extensions.map(ext => `${resolvePath(root).replace(/\\/g, '/')}/**/tsconfig${ext}`),
+		{
+			ignoreInitial: false,
+			ignored: [
+				'**/.git',
+				'**/node_modules',
 
-			...ignore.map(fp => resolvePath(fp))
-		],
-	})
+				...ignore.map(fp => resolvePath(fp))
+			],
+		}
+	)
 
 	buildWatcher.on(READY, () => external.emit(READY))
 	buildWatcher.on(ERROR, error => external.emit(ERROR, error))

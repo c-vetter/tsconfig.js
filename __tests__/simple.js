@@ -15,33 +15,39 @@ const {
 sample('builds json files properly', 'base')
 sample('overwrites pre-existing json file if js file present', 'overwrite')
 sample('leaves out invalid files', 'guard')
-sample('leaves out undesired files', 'guard-custom', () => ['**/sub'])
-sample('ignores directories and files', 'ignore', target => [
+sample('leaves out undesired files', 'guard-custom', () => ({ ignore: ['**/sub'] }))
+sample('ignores directories and files', 'ignore', target => ({ ignore: [
 	target('ignore-directory'),
 	target('ignore-file', jsFile),
-])
-sample('does not build dependencies', 'dependencies', target => target(jsFile))
+]}))
+sample('does not build dependencies', 'dependencies', target => ({ ignore: target(jsFile) }))
+sample('handles registerable sources', 'toml', () => ({ extensions: ['.toml'] }))
+sample('handles self-registering sources', 'typescript', target => ({
+	extensions: ['.ts'],
+	ignore: target('tsconfig.ts'), // prevent `sub/tsconfig.ts` loading `tsconfig.json`, this catches lack of moble resolution
+}))
 
 
-function sample (label, namespace, ignore) {
+function sample (label, namespace, options) {
 	test(label, async t => {
 		const {
-			run,
+			once,
 			control,
 			target,
 		} = prepare(namespace)
 
-		if (ignore) {
-			ignore = ignore(target)
+		if (options) {
+			options = options(target)
 		}
 
+		await once(options)
 		await checkFiles(t, control)
 
 		const {
 			watch,
 		} = prepare(namespace)
 
-		const watcher = watch({ignore})
+		const watcher = watch(options)
 		await new Promise((resolve, reject) => {
 			watcher.on(ERROR, reject)
 			watcher.on(READY, ()=>watcher.close())

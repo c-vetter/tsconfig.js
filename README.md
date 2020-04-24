@@ -94,7 +94,7 @@ Both take an object of options as the only argument, with these fields:
 	+ `"drop-relative"` (default): removes all relative paths. Relative paths from imported configs cannot work, so they should be dropped
 	+ `"drop-any"`: If you don't care about extending at all, you can just drop this altogether
 	+ `"ignore"`: do nothing
-+ `extensions`: an array of extensions to process, defaults to `['js']`
++ `extensions`: an array of extensions to process, defaults to `['.js']`
 	+ requires `interpret` (see optional dependencies)
 
 `tsconfig.js/once` returns a `Promise` that resolves when all `tsconfig.js` files have been converted.
@@ -118,23 +118,23 @@ const tsconfigJs = require('tsconfig.js')
 tsconfigJs({
 	root: 'src',
 	comment: true,
-	extends: 'drop-relative',
+	extends: 'drop-any',
 	extensions: [
-		'ts',
-		'json5',
+		'.ts',
+		'.toml',
 	],
 	ignore: [
 		'src/legacy',
-		'src/tsconfig.js', // only a dependency
+		'src/**/tsconfig.toml', // only a dependency
 	],
 })
 ```
 
-This reads any `tsconfig.ts` and `tsconfig.json5` files found in `./src/` and its sub-directories, then writes the equivalent `tsconfig.json` files.
+This reads any `tsconfig.ts` files found in `./src/` and its sub-directories, then writes the equivalent `tsconfig.json` files.
 
-It ignores the specific file `src/tsconfig.js` as well as any `tsconfig.*` files within `src/legacy`.
+It ignores `tsconfig.toml` files as well as any `tsconfig.*` files within `src/legacy`. By including `'.toml'` in the extensions those files are made available to node's `require`.
 
-Also, the `extends` field in the resulting `tsconfig.json` is dropped if relative.
+Also, the `extends` field in the resulting `tsconfig.json` is always dropped.
 
 Finally, every generated `tsconfig.json` will include a comment indicating its source.
 
@@ -152,7 +152,7 @@ The `--extends` argument sets the strategy for dealing with `extends`, valid val
 
 The `--root` argument sets the root directory.
 
-The `--extensions` argument takes the comma-separated list of extensions to look for. Remember to include `js` if applicable. Requires [interpret][] (see optional dependencies).
+The `--extensions` argument takes the comma-separated list of extensions to look for. Remember to include `.js` if applicable. Requires [interpret][] (see optional dependencies).
 
 The other arguments are passed to the underlying node API as an array, signifying the ignore-paths.
 
