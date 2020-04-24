@@ -3,24 +3,25 @@
 
 // drop `node` and `cli.js`, the actual parameters come after those
 const {
-	_: ignoreParam,
+	_: ignore,
 	once,
 
-	comment: commentParam,
-	root: rootParam,
-	extends: extendsParam,
-	extensions: extensionsParam,
+	root,
+	extensions,
+
+	['add-comments']: addComments,
+	['extends-strategy']: extendsStrategy,
 } = require('minimist')(process.argv.slice(2), {
-	boolean: ['comment', 'once'],
-	string: ['extends', 'extensions', 'root'],
+	boolean: ['once'],
+	string: ['add-comments', 'extends-strategy', 'extensions', 'root'],
 })
 
 const options = {
-	ignore: ignoreParam,
-	comment: commentParam,
-	root: rootParam,
-	extends: extendsParam,
-	extensions: (extensionsParam || 'js').split(','),
+	root: root,
+	ignore: ignore,
+	addComments,
+	extendsStrategy,
+	extensions: (extensions || 'js').split(','),
 }
 
 if (once) {

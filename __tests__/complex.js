@@ -1,3 +1,5 @@
+const path = require('path')
+
 const chokidar = require('chokidar')
 const fs = require('fs-extra')
 const test = require('ava').serial
@@ -19,19 +21,44 @@ const {
 } = require('../src/events')
 
 
-test('handles `extends` as per given option', async t => {
+test('handles `extends` as per the selected strategy', async t => {
 	const {
 		once,
 		target,
 		control,
 	} = prepare('extends')
 
-	await once({extends: 'drop-relative', root: target('drop-relative')})
-	await once({extends: 'drop-any', root: target('drop-any')})
-	await once({extends: 'ignore', root: target('ignore')})
+	await once({extendsStrategy: 'drop-relative', root: target('drop-relative')})
+	await once({extendsStrategy: 'drop-any', root: target('drop-any')})
+	await once({extendsStrategy: 'ignore', root: target('ignore')})
 
 	return checkFiles(t, control)
 })
+
+
+test('adds comments as per the selected strategy', async t => {
+	const {
+		once,
+		target,
+		control,
+	} = prepare('comments')
+
+	await once({addComments: 'info', root: target('info')})
+	await once({addComments: 'minimal', root: target('minimal')})
+	await once({addComments: 'none', root: target('none')})
+
+	return checkFiles(t, control, true)
+	.then(paths => paths.forEach(p => t.is(
+		fs.readFileSync(control(p)).toString().trim()
+		.replace(
+			'[FILEPATH]',
+			path.resolve(target(p).replace('.json', '.js'))
+		),
+		fs.readFileSync(target(p)).toString().trim(),
+		`wrong comment in ${p}`
+	)))
+})
+
 
 test('throws if given extensions cannot be enabled', async t => {
 	const { once } = prepare()

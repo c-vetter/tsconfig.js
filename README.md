@@ -89,8 +89,11 @@ You can import either `tsconfig.js/once` or `tsconfig.js/watch`, depending on ho
 Both take an object of options as the only argument, with these fields:
 + `root`: a directory path at which to start looking for `tsconfig.js` files, will be resolved, defaults to '.'
 + `ignore`: an array of paths to ignore
-+ `comment`: if `true` (default), each `tsconfig.json` will include a comment indicating the source `tsconfig.js` file. Requires [TypeScript v1.8+](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-1-8.html#allow-comments-in-tsconfigjson)
-+ `extends`: a string determining the strategy to use for the `extends` field:
++ `addComments`: each `tsconfig.json` should include a comment indicating the source `tsconfig.js` file. This determines if and what to put in there. Requires [TypeScript v1.8+](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-1-8.html#allow-comments-in-tsconfigjson)
+	+ `"info"` (default): warn against editing the file, indicate the source file, and link to documentation
+	+ `"minimal"`: indicate the source file
+	+ `"none"`: add no comments
++ `extendsStrategy`: a string determining the strategy to use for the `extends` field:
 	+ `"drop-relative"` (default): removes all relative paths. Relative paths from imported configs cannot work, so they should be dropped
 	+ `"drop-any"`: If you don't care about extending at all, you can just drop this altogether
 	+ `"ignore"`: do nothing
@@ -117,7 +120,7 @@ const tsconfigJs = require('tsconfig.js')
 
 tsconfigJs({
 	root: 'src',
-	comment: true,
+	addComments: 'none',
 	extends: 'drop-any',
 	extensions: [
 		'.ts',
@@ -136,21 +139,21 @@ It ignores `tsconfig.toml` files as well as any `tsconfig.*` files within `src/l
 
 Also, the `extends` field in the resulting `tsconfig.json` is always dropped.
 
-Finally, every generated `tsconfig.json` will include a comment indicating its source.
+Finally, generated `tsconfig.json` files will not include comments, e.g. to support an old version of TypeScript.
 
 
 ## CLI
 ```bash
-npx tsconfig.js [--once] [--extends=strategy] [--root=src] [--extensions=ext,ext..] [-- [src/ignored-file/tsconfig.js].. [src/ignored-directory/]..]
+npx tsconfig.js [--once] [--root=src] [--add-comments=strategy] [--extends=strategy] [--extensions=ext,ext..] [-- [src/ignored-file/tsconfig.js].. [src/ignored-directory/]..]
 ```
 
 By default, the watcher is used, but setting `--once` has `tsconfig.js` run only once.
 
-The `--comment` flag adds source comments to built `tsconfig.json` files.
-
-The `--extends` argument sets the strategy for dealing with `extends`, valid values: `drop-any`, `drop-relative`. `ignore`
+The `--add-comments` argument sets the strategy for adding comments, valid values: `drop-any`, `drop-relative`, `ignore`
 
 The `--root` argument sets the root directory.
+
+The `--extends-strategy` argument sets the strategy for dealing with `extends`, valid values: `drop-any`, `drop-relative`, `ignore`
 
 The `--extensions` argument takes the comma-separated list of extensions to look for. Remember to include `.js` if applicable. Requires [interpret][] (see optional dependencies).
 

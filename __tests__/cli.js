@@ -44,27 +44,27 @@ test('root parameter', t => {
 	)
 })
 
-test('extends parameter', t => {
+test('extendsStrategy parameter', t => {
 	checkOptions(t,
-		'--extends=p1 p2 p3',
+		'--extends-strategy=p1 p2 p3',
 		{
-			extends: p1,
+			extendsStrategy: p1,
 			ignore: [p2, p3],
 		}
 	)
 
 	checkOptions(t,
-		'p1 --extends p2 p3',
+		'p1 --extends-strategy p2 p3',
 		{
-			extends: p2,
+			extendsStrategy: p2,
 			ignore: [p1, p3],
 		}
 	)
 
 	checkOptions(t,
-		'p1 p2 --extends=p3',
+		'p1 p2 --extends-strategy=p3',
 		{
-			extends: p3,
+			extendsStrategy: p3,
 			ignore: [p1, p2],
 		}
 	)
@@ -72,32 +72,32 @@ test('extends parameter', t => {
 
 test('all parameters', t => {
 	checkOptions(t,
-		'p1 --root root p2 --extends ext p3',
+		'p1 --root root p2 --extends-strategy ext p3',
 
 		{
 			root: 'root',
-			extends: 'ext',
+			extendsStrategy: 'ext',
 			ignore: [p1, p2, p3],
 		}
 	)
 
 	checkOptions(t,
-		'p1 --extends ext p2 --root root p3',
+		'p1 --extends-strategy ext p2 --root root p3',
 
 		{
 			root: 'root',
-			extends: 'ext',
+			extendsStrategy: 'ext',
 			ignore: [p1, p2, p3],
 		}
 	)
 
 	checkOptions(t,
-		'--comment --extends=ext --extensions=ext1,ext2,ext3 --root=root -- p1 p2 p3',
+		'--add-comments=none --extends-strategy=ext --extensions=ext1,ext2,ext3 --root=root -- p1 p2 p3',
 
 		{
 			root: 'root',
-			comment: true,
-			extends: 'ext',
+			addComments: 'none',
+			extendsStrategy: 'ext',
 			extensions: ['ext1', 'ext2', 'ext3'],
 			ignore: [p1, p2, p3],
 		}
@@ -106,8 +106,8 @@ test('all parameters', t => {
 
 function checkOptions (t, input, optionsRequired) {
 	const optionsExpected = {
-		comment: false,
-		extends: undefined,
+		addComments: undefined,
+		extendsStrategy: undefined,
 		extensions: ['js'],
 		ignore: [],
 		root: undefined,

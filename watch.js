@@ -28,30 +28,30 @@ function tsconfigWatch (options = {}) {
 
 	watcher.on(CREATE_TARGET, file => queue(() => (
 		add(file, true)
-		.then(() => build(file))
+		.then(() => build(file, options))
 		.catch(emitError)
 	)))
 	watcher.on(UPDATE_TARGET, file => queue(() => (
-		build(file)
+		build(file, options)
 		.catch(emitError)
 	)))
 	watcher.on(DELETE_TARGET, file => queue(() => (
-		build(file)
+		build(file, options)
 		.then(() => remove(file, true))
 		.catch(emitError)
 	)))
 
 	watcher.on(CREATE_DEPENDENCY, file => queue(() => (
 		add(file)
-		.then(() => build(file))
+		.then(() => build(file, options))
 		.catch(emitError)
 	)))
 	watcher.on(UPDATE_DEPENDENCY, file => queue(() => (
-		build(file)
+		build(file, options)
 		.catch(emitError)
 	)))
 	watcher.on(DELETE_DEPENDENCY, file => queue(() => (
-		build(file)
+		build(file, options)
 		.then(() => remove(file))
 		.catch(emitError)
 	)))
@@ -95,14 +95,14 @@ function tsconfigWatch (options = {}) {
 
 	// Helpers
 
-	async function build (filepath) {
+	async function build (filepath, options) {
 		return Promise.all(
 			[filepath]
 			.concat(dependenciesMap.dependantsOf(filepath))
 			.map(fp => delete require.cache[fp] && fp)
 			.filter(fp => dependenciesMap.getNodeData(fp).buildable)
 			.filter(fp => fs.existsSync(fp))
-			.map(fp => make(fp).then(updateDependencies(fp)))
+			.map(fp => make(fp, options).then(updateDependencies(fp)))
 		)
 	}
 

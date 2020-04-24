@@ -31,8 +31,8 @@ module.exports = {
 function prepare (namespace, keep=false) {
 	keep || clean()
 
-	const once = (options) => tsconfigOnce({ root: target(), ...options })
-	const watch = (options) => tsconfigWatch({ root: target(), ...options })
+	const once = (options) => tsconfigOnce({ root: target(), addComments: 'none', ...options })
+	const watch = (options) => tsconfigWatch({ root: target(), addComments: 'none', ...options })
 
 	if(!namespace) {
 		return {
@@ -62,8 +62,8 @@ function clean() {
 
 
 
-function checkFiles (t, control) {
-	return collectPaths(control)
+function checkFiles (t, control, skipContents = false) {
+	const base = collectPaths(control)
 	.then(([ result, ctrl ]) => {
 		// all expected files are there
 		ctrl.forEach(p => t.true(result.includes(p), `missing file ${p}`))
@@ -73,7 +73,12 @@ function checkFiles (t, control) {
 
 		return result
 	})
-	.then(paths => paths.forEach(p => t.deepEqual(
+
+	if (skipContents) {
+		return base
+	}
+
+	return base.then(paths => paths.forEach(p => t.deepEqual(
 		fs.readJsonSync(control(p)),
 		fs.readJsonSync(target(p)),
 		`aberration in ${p}`

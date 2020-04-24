@@ -4,32 +4,49 @@ const fs = require('fs-extra')
 
 module.exports = make
 
-function make(filepath, options = {}) {
-	const tsconfig = require(filepath)
+function make(filepath, { extendsStrategy, addComments }) {
+	try {
+		const tsconfig = require(filepath)
 
-	if (tsconfig.extends) {
-		switch (options.extends) {
-			case 'ignore': break
+		if (tsconfig.extends) {
+			switch (extendsStrategy) {
+				case 'ignore': break
 
-			case 'drop-any':
-				delete tsconfig.extends
+				case 'drop-any':
+					delete tsconfig.extends
+				break
+
+				case 'drop-relative':
+				default:
+					if (tsconfig.extends.startsWith('.')) {
+						delete tsconfig.extends
+					}
+				break
+			}
+		}
+
+		const output = [JSON.stringify(tsconfig)]
+
+		switch (addComments) {
+			case 'none': break
+
+			case 'minimal':
+				output.unshift(`// ${filepath}`)
 			break
 
-			case 'drop-relative':
+			case 'info':
 			default:
-				if (tsconfig.extends.startsWith('.')) {
-					delete tsconfig.extends
-				}
+				output.unshift(`// source file: ${filepath}`)
+				output.unshift('// built using `tsconfig.js` (https://www.npmjs.com/package/tsconfig.js)')
+				output.unshift('// DO NOT EDIT!!!!')
 			break
 		}
-	}
 
-	try {
 		const { dir, name } = path.parse(filepath)
 
-		return fs.writeJson(
+		return fs.writeFile(
 			`${dir}/${name}.json`,
-			tsconfig
+			output.join('\n')
 		)
 	} catch (e) {
 		e.stack = `Error: ${e.message}\n    at make(${filepath}, ${JSON.stringify(options)})`
