@@ -4,12 +4,14 @@
 // drop `node` and `cli.js`, the actual parameters come after those
 const {
 	_: ignoreParam,
+	once,
+
 	comment: commentParam,
 	root: rootParam,
 	extends: extendsParam,
 	extensions: extensionsParam,
 } = require('minimist')(process.argv.slice(2), {
-	boolean: ['comment'],
+	boolean: ['comment', 'once'],
 	string: ['extends', 'extensions', 'root'],
 })
 
@@ -21,14 +23,14 @@ const options = {
 	extensions: (extensionsParam || 'js').split(','),
 }
 
-if (process.argv.slice(2).includes('--no-watch')) {
-	require('./src/once')(options)
+if (once) {
+	require('./once')(options)
 	.catch(e => {
 		process.exitCode = 1
 		printError(e)
 	})
 } else {
-	require('./src/watch')(options)
+	require('./watch')(options)
 	.on('error', printError)
 }
 

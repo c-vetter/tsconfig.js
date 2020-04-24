@@ -1,16 +1,16 @@
-const extractDependencies = require('./extract-dependencies')
-const make = require('./make')
-const watch = require('./watcher')
+const extractDependencies = require('./src/extract-dependencies')
+const make = require('./src/make')
+const watch = require('./src/watcher')
 
 const {
 	ERROR,
 	READY,
 	CREATE_TARGET: FIND,
-} = require('./events')
+} = require('./src/events')
 
 module.exports = tsconfig
 
-function tsconfig (options) {
+function tsconfig (options = {}) {
 	return new Promise((resolve, reject) => {
 		const watcher = watch(options)
 		watcher.on(ERROR, reject)
@@ -32,10 +32,11 @@ async function build (filepath, options) {
 }
 
 function clearCache (filepath) {
-	delete require.cache[filepath]
-
 	const dependencies = extractDependencies(filepath)
-	if (!dependencies) return
 
-	dependencies.forEach(clearCache)
+	if (dependencies) {
+		dependencies.forEach(clearCache)
+	}
+
+	delete require.cache[filepath]
 }

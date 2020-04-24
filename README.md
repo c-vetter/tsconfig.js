@@ -1,5 +1,6 @@
 # tsconfig.js
 Enables using `tsconfig.js` files instead of `tsconfig.json` files with all the benefits that brings.
+Starting with v2.0.0, you can use transpilable source types like TypeScript.
 
 
 + [What it is](#what-it-is)
@@ -50,7 +51,7 @@ This package offers a recommended watch mode for close-to-seemless operation, as
 
 In order to be as seemless as possible, the `tsconfig.js` watcher builds a dependency map of your config files and rebuilds the targeted config files as needed.
 
-Starting with v1.2.0, you can use transpilable source types like TypeScript. This is based on [interpret][]. Therefore, you can use the same types as for [webpack](https://webpack.js.org/configuration/configuration-languages/). This is opt-in via the `extensions` configuration. The rest of this document will talk of `tsconfig.js` files, but everything applies equally to `tsconfig.ts` files and the like.
+Starting with v2.0.0, you can use transpilable source types like TypeScript. This is based on [interpret][]. Therefore, you can use the same types as for [webpack](https://webpack.js.org/configuration/configuration-languages/). This is opt-in via the `extensions` configuration. The rest of this document will talk of `tsconfig.js` files, but everything applies equally to `tsconfig.ts` files and the like.
 
 
 ## What it does not
@@ -83,26 +84,23 @@ If that is unreliable as well, you may be stuck with using JSON files until the 
 
 
 ## node API
-You can import either `tsconfig.js` or `tsconfig.js/watch`, depending on how you will use it.
+You can import either `tsconfig.js/once` or `tsconfig.js/watch`, depending on how you will use it.
 
 Both take an object of options as the only argument, with these fields:
 + `root`: a directory path at which to start looking for `tsconfig.js` files, will be resolved, defaults to '.'
 + `ignore`: an array of paths to ignore
-+ `comment`: if `true` (recommended), each `tsconfig.json` will include a comment indicating the source `tsconfig.js` file. Requires [TypeScript v1.8+](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-1-8.html#allow-comments-in-tsconfigjson). This is not the default for backwards compatibility
++ `comment`: if `true` (default), each `tsconfig.json` will include a comment indicating the source `tsconfig.js` file. Requires [TypeScript v1.8+](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-1-8.html#allow-comments-in-tsconfigjson)
 + `extends`: a string determining the strategy to use for the `extends` field:
-	+ `"drop-relative"` (recommended): removes all relative paths. Relative paths from imported configs cannot work, so they should be dropped. This is not the default for backwards compatibility
+	+ `"drop-relative"` (default): removes all relative paths. Relative paths from imported configs cannot work, so they should be dropped
 	+ `"drop-any"`: If you don't care about extending at all, you can just drop this altogether
-	+ `"ignore"` (default): do nothing
+	+ `"ignore"`: do nothing
 + `extensions`: an array of extensions to process, defaults to `['js']`
 	+ requires `interpret` (see optional dependencies)
 
-> [NOTE] For backwards compatibility (v1.0), you can give `root` as first and `ignore` as the second parameter: `tsconfigJs('src', ['src/legacy'])`
-
-`tsconfig.js` returns a `Promise` that resolves when all `tsconfig.js` files have been converted.
+`tsconfig.js/once` returns a `Promise` that resolves when all `tsconfig.js` files have been converted.
 `tsconfig.js/watch` returns an `EventEmitter` that you can call `close` on to stop watching.
 
-And that is it.
-
+`require('tsconfig.js')` returns an object with the keys `once` and `watch`. Those delegate to the files above.
 
 ### Examples
 #### The simplest form
@@ -143,10 +141,10 @@ Finally, every generated `tsconfig.json` will include a comment indicating its s
 
 ## CLI
 ```bash
-npx tsconfig.js [--no-watch] [--extends=strategy] [--root=src] [--extensions=ext,ext..] [-- [src/ignored-file/tsconfig.js].. [src/ignored-directory/]..]
+npx tsconfig.js [--once] [--extends=strategy] [--root=src] [--extensions=ext,ext..] [-- [src/ignored-file/tsconfig.js].. [src/ignored-directory/]..]
 ```
 
-By default, the watcher is used, but setting `--no-watch` has `tsconfig.js` run only once.
+By default, the watcher is used, but setting `--once` has `tsconfig.js` run only once.
 
 The `--comment` flag adds source comments to built `tsconfig.json` files.
 
@@ -161,10 +159,11 @@ The other arguments are passed to the underlying node API as an array, signifyin
 
 # Changelog
 
-## [1.2.0]
+## [2.0.0]
 +	custom extensions beyond `.js`
 +	source comments
 +	improved dependency acquisition
++	`--once` instead of `--no-watch`
 
 ## [1.1.0]
 +	node API switched to options object, positional parameters deprecated

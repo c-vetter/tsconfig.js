@@ -1,9 +1,9 @@
 const { DepGraph } = require('dependency-graph')
 const fs = require('fs-extra')
 
-const extractDependencies = require('./extract-dependencies')
-const make = require('./make')
-const watch = require('./watcher')
+const extractDependencies = require('./src/extract-dependencies')
+const make = require('./src/make')
+const watch = require('./src/watcher')
 
 const {
 	ERROR,
@@ -11,12 +11,12 @@ const {
 	CREATE_TARGET, CREATE_DEPENDENCY,
 	UPDATE_TARGET, UPDATE_DEPENDENCY,
 	DELETE_TARGET, DELETE_DEPENDENCY,
-} = require('./events')
+} = require('./src/events')
 
 
 module.exports = tsconfigWatch
 
-function tsconfigWatch (options) {
+function tsconfigWatch (options = {}) {
 	const watcher = watch(options, true)
 
 	const dependenciesMap = new DepGraph()
@@ -96,15 +96,14 @@ function tsconfigWatch (options) {
 	// Helpers
 
 	async function build (filepath) {
-		return updateDependencies(filepath)
-		.then(() => Promise.all(
+		return Promise.all(
 			[filepath]
 			.concat(dependenciesMap.dependantsOf(filepath))
 			.map(fp => delete require.cache[fp] && fp)
 			.filter(fp => dependenciesMap.getNodeData(fp).buildable)
 			.filter(fp => fs.existsSync(fp))
-			.map(fp => make(fp))
-		))
+			.map(fp => make(fp).then(updateDependencies(fp)))
+		)
 	}
 
 	async function updateDependencies (filepath) {

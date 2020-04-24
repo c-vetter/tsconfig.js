@@ -6,7 +6,8 @@ const fs = require('fs-extra')
 const readdirp = require('readdirp')
 const test = require('ava').serial
 
-const tsconfig = require('..')
+const tsconfigOnce = require('../once')
+const tsconfigWatch = require('../watch')
 
 const {
 	ERROR,
@@ -34,7 +35,7 @@ const jsonFile = 'tsconfig.json'
 test('simple call returns a Promise', t => {
 	clean()
 
-	const promise = tsconfig(target())
+	const promise = tsconfigOnce({ root: target() })
 	t.assert(promise instanceof Promise)
 
 	return promise
@@ -43,7 +44,7 @@ test('simple call returns a Promise', t => {
 test('watch call returns a closable EventEmitter', t => {
 	clean()
 
-	const eventEmitter = tsconfig.watch(target())
+	const eventEmitter = tsconfigWatch({ root: target() })
 
 	t.assert(eventEmitter instanceof EventEmitter)
 
@@ -77,7 +78,7 @@ test('simple call defaults to current working directory', async t => {
 
 		process.chdir(targetDirectory)
 
-		return tsconfig()
+		return tsconfigOnce()
 		.then(resolve)
 		.catch(reject)
 	})
@@ -108,7 +109,7 @@ test('watch call defaults to current working directory', async t => {
 
 		process.chdir(targetDirectory)
 
-		const watcher = tsconfig.watch()
+		const watcher = tsconfigWatch()
 		watcher.on(ERROR, error => {
 			watcher.close()
 			reject(error)
@@ -240,7 +241,7 @@ test('watcher triggers rebuild from dependency', async t => {
 	)
 
 
-	const watcher = tsconfig.watch(target('sub'))
+	const watcher = tsconfigWatch({ root: target('sub') })
 	await new Promise((resolve, reject) => {
 		watcher.on(ERROR, reject)
 		watcher.on(READY, resolve)
@@ -281,7 +282,7 @@ test('watcher does not build dependency', async t => {
 		target('sub', jsFile)
 	)
 
-	const watcher = tsconfig.watch(target('sub'))
+	const watcher = tsconfigWatch({ root: target('sub') })
 	await new Promise((resolve, reject) => {
 		watcher.on(ERROR, reject)
 		watcher.on(READY, resolve)
@@ -381,8 +382,8 @@ function prepare (namespace, keep=false) {
 	keep || clean()
 	fs.copySync(source(src), target())
 
-		const run = (options) => tsconfig({ root: target(), ...options })
-		const watch = (options) => tsconfig.watch({ root: target(), ...options })
+	const run = (options) => tsconfigOnce({ root: target(), ...options })
+	const watch = (options) => tsconfigWatch({ root: target(), ...options })
 
 	return {
 		run,

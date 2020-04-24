@@ -1,12 +1,6 @@
 const path = require('path')
 
-module.exports = function resolvePath (filepath, context) {
-	const relative = /^[.]{1,2}[\\/]/.test(filepath)
-
-	if (relative) {
-		filepath = path.resolve(path.dirname(context), filepath)
-	}
-
+module.exports = function resolvePath (filepath) {
 	try {
 		// add file extension
 		return require.resolve(filepath) // throws if not found, hence try

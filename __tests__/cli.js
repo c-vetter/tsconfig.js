@@ -119,7 +119,7 @@ function checkOptions (t, input, optionsRequired) {
 
 	prepare(input)
 	require('proxyquire').noCallThru()('../cli.js', {
-		'./src/once': o => {
+		'./once': o => {
 			options = o
 			return { catch() {} }
 		}
@@ -128,7 +128,7 @@ function checkOptions (t, input, optionsRequired) {
 
 	prepare(input, true)
 	proxyquire('../cli.js', {
-		'./src/watch': o => {
+		'./watch': o => {
 			options = o
 			return { on() {} }
 		}
@@ -139,7 +139,7 @@ function checkOptions (t, input, optionsRequired) {
 function prepare(input, watch) {
 	process.argv = ['npx', 'tsconfig.js']
 
-	if (!watch) process.argv.push('--no-watch')
+	if (!watch) process.argv.push('--once')
 
 	if (input) process.argv.push(...input.split(' '))
 }

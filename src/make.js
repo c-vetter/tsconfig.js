@@ -1,6 +1,8 @@
 const fs = require('fs-extra')
 
-module.exports = function make(filepath, options = {}) {
+module.exports = make
+
+function make(filepath, options = {}) {
 	const tsconfig = require(filepath)
 
 	switch (options.extends) {
