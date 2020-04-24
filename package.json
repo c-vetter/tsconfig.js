@@ -9,7 +9,7 @@
     "src/*.js"
   ],
   "scripts": {
-    "test": "ava"
+    "test": "ava --serial"
   },
   "repository": {
     "type": "git",
