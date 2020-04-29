@@ -84,7 +84,7 @@ If that is unreliable as well, you may be stuck with using JSON files until the 
 
 
 ## node API
-You can import either `tsconfig.js/once` or `tsconfig.js/watch`, depending on how you will use it.
+You can import either `tsconfig.js/once` or `tsconfig.js/watch`, depending on how you will use it. They are aliased as members of `tsconfig.js`, so you can do `require('tsconfig.js').once` or `require('tsconfig.js').watch`, respectively.
 
 Both take an object of options as the only argument, with these fields:
 + `root`: a directory path at which to start looking for `tsconfig.js` files, will be resolved, defaults to '.'
@@ -167,6 +167,7 @@ The other arguments are passed to the underlying node API as an array, signifyin
 +	source comments
 +	improved dependency acquisition
 +	`--once` instead of `--no-watch`
++	removed legacy API
 
 ## [1.1.0]
 +	node API switched to options object, positional parameters deprecated
