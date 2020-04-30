@@ -12,6 +12,7 @@ Starting with v2.0.0, you can use transpilable source types like TypeScript.
 + [How to use it](#how-to-use-it)
 	+ [node API](#node-api)
 	+ [CLI](#cli)
+	+ [transpilable sources][]
 + [Changelog](#changelog)
 
 
@@ -47,11 +48,11 @@ This package is the result.
 `tsconfig.js` turns JS-based configuration files into their JSON equivalents.
 That allows TypeScript to stick to its intended JSON format while enabling users to put their configuration in JS files.
 
-This package offers a recommended watch mode for close-to-seemless operation, as well as a single-run mode so you can trigger re-builds as you see fit.
+This package offers a recommended watch mode for close-to-seamless operation, as well as a single-run mode so you can trigger re-builds as you see fit.
 
-In order to be as seemless as possible, the `tsconfig.js` watcher builds a dependency map of your config files and rebuilds the targeted config files as needed.
+In order to be as seamless as possible, the `tsconfig.js` watcher builds a dependency map of your config files and rebuilds the targeted config files as needed.
 
-Starting with v2.0.0, you can use transpilable source types like TypeScript. This is based on [interpret][]. Therefore, you can use the same types as for [webpack](https://webpack.js.org/configuration/configuration-languages/). This is opt-in via the `extensions` configuration. The rest of this document will talk of `tsconfig.js` files, but everything applies equally to `tsconfig.ts` files and the like.
+Starting with v2.0.0, you can use transpilable source types like TypeScript. See [transpilable sources][] for details.
 
 
 ## What it does not
@@ -98,7 +99,7 @@ Both take an object of options as the only argument, with these fields:
 	+ `"drop-any"`: If you don't care about extending at all, you can just drop this altogether
 	+ `"ignore"`: do nothing
 + `extensions`: an array of extensions to process, defaults to `['.js']`
-	+ requires `interpret` (see optional dependencies)
+	+ see [transpilable sources][]
 
 `tsconfig.js/once` returns a `Promise` that resolves when all `tsconfig.js` files have been converted.
 `tsconfig.js/watch` returns an `EventEmitter` that you can call `close` on to stop watching.
@@ -155,12 +156,24 @@ The `--root` argument sets the root directory.
 
 The `--extends-strategy` argument sets the strategy for dealing with `extends`, valid values: `drop-any`, `drop-relative`, `ignore`
 
-The `--extensions` argument takes the comma-separated list of extensions to look for. Remember to include `.js` if applicable. Requires [interpret][] (see optional dependencies).
+The `--extensions` argument takes the comma-separated list of extensions to look for. Remember to include `.js` if applicable. See [transpilable sources][].
 
 The other arguments are passed to the underlying node API as an array, signifying the ignore-paths.
 
+## Transpilable sources
+Starting with v2.0.0, you can use transpilable source types like TypeScript. This is based on [interpret][]. Therefore, you can use the same types as for [webpack](https://webpack.js.org/configuration/configuration-languages/).
+
+This is opt-in via the `extensions` configuration. If you include any extensions other than `.js`, this feature is activated. The rest of this document will generally talk of `tsconfig.js` files, but everything applies equally to `tsconfig.ts` files and the like.
+
+When using this feature, you need [interpret][], as well as an appropriate loader. You can find all available extensions and their usable loaders at [interpret#extensions](https://www.npmjs.com/package/interpret#extensions).
+
+While this package lists `interpret` as an optional dependency to make the relation clear, the same is not true for the loaders which are out of scope here. **It is your responsibility to install any and all required loaders**, including their peer dependencies (if any). For example, if you want to use this with TypeScript, include `typescript` and `ts-node` in your `package.json/dependencies`, and either `npm install` with optional dependencies or include `interpret` in your `package.json/dependencies`.
+
 
 # Changelog
+
+## [2.0.1]
++	additional documentation
 
 ## [2.0.0]
 +	custom extensions beyond `.js`
@@ -182,3 +195,4 @@ The other arguments are passed to the underlying node API as an array, signifyin
 
 
 [interpret]: https://www.npmjs.com/package/interpret
+[transpilable sources]: #transpilable-sources
