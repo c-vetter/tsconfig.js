@@ -6,6 +6,7 @@ const test = require('ava').serial
 
 const {
 	prepare,
+	jsFile,
 	jsonFile,
 	tsconfigOnce,
 	tsconfigWatch,
@@ -122,32 +123,67 @@ test('watch call defaults to current working directory', async t => {
 // Error Handling
 
 
-test('rejects on error', t => {
+test('rejects on errors', async t => {
 	const {
 		once,
+		target,
 	} = prepare('error')
 
-	return t.throwsAsync(() => once())
+	let errors
+
+	await once()
+	.then(() => t.fail('did not reject'))
+	.catch(e => { errors = e })
+
+	t.is(errors.length, 3)
+
+	const errorMessages = errors.map(({ message }) => message).sort()
+
+	const escapedFilename = (...p) => target(...p, jsFile).replace(/\\/g, '\\\\')
+
+	t.regex(errorMessages[0], new RegExp(`Cannot find module '../../tsconfig'`))
+	t.regex(errorMessages[0], new RegExp(escapedFilename('sub')))
+
+	t.regex(errorMessages[1], new RegExp(`Cannot find module '../tsconfig'`))
+	t.regex(errorMessages[1], new RegExp(escapedFilename()))
+
+	t.regex(errorMessages[2], new RegExp(`Cannot find module 'tsconfigs/unknown'`))
+	t.regex(errorMessages[2], new RegExp(escapedFilename('package')))
 })
 
 
 test('watcher emits errors', async t => {
 	const {
+		target,
 		watch,
 	} = prepare('error')
 
 	const watcher = watch()
 
-	t.assert(
-		await new Promise((resolve, reject) => {
-			watcher.on(ERROR, resolve)
+	const errors = []
 
-			watcher.on(READY, () =>
-				setTimeout(() => {
-					reject('no error event emitted within 500ms')
-				}, 500)
-			)
+	t.is(
+		3,
+		await new Promise((resolve) => {
+			watcher.on(ERROR, e => {
+				errors.push(e)
+			})
+
+			watcher.on(READY, () => resolve(errors.length))
 		})
 		.finally(() => watcher.close())
 	)
+
+	const errorMessages = errors.map(({ message }) => message).sort()
+
+	const escapedFilename = (...p) => target(...p, jsFile).replace(/\\/g, '\\\\')
+
+	t.regex(errorMessages[0], new RegExp(`Cannot find module '../../tsconfig'`))
+	t.regex(errorMessages[0], new RegExp(escapedFilename('sub')))
+
+	t.regex(errorMessages[1], new RegExp(`Cannot find module '../tsconfig'`))
+	t.regex(errorMessages[1], new RegExp(escapedFilename()))
+
+	t.regex(errorMessages[2], new RegExp(`Cannot find module 'tsconfigs/unknown'`))
+	t.regex(errorMessages[2], new RegExp(escapedFilename('package')))
 })

@@ -16,6 +16,7 @@ const src = 'src'
 const ctrl = 'ctrl'
 const jsFile = 'tsconfig.js'
 const jsonFile = 'tsconfig.json'
+const logFile = 'tsconfig.log.json'
 const tsFile = 'tsconfig.ts'
 
 module.exports = {
@@ -23,6 +24,7 @@ module.exports = {
 	checkFiles,
 	jsFile,
 	jsonFile,
+	logFile,
 	tsFile,
 	tsconfigOnce,
 	tsconfigWatch,
@@ -31,8 +33,8 @@ module.exports = {
 function prepare (namespace, keep=false) {
 	keep || clean()
 
-	const once = (options) => tsconfigOnce({ root: target(), addComments: 'none', ...options })
-	const watch = (options) => tsconfigWatch({ root: target(), addComments: 'none', ...options })
+	const once = (options) => tsconfigOnce({ root: target(), addComments: 'none', logLevel: 'silent', ...options })
+	const watch = (options) => tsconfigWatch({ root: target(), addComments: 'none', logLevel: 'silent', ...options })
 
 	if(!namespace) {
 		return {

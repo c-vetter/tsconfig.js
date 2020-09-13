@@ -1,4 +1,5 @@
 const EventEmitter = require('events')
+
 const chokidar = require('chokidar')
 
 const resolvePath = require('./resolve-path')
@@ -13,8 +14,13 @@ const {
 } = require('./events')
 
 
-module.exports = function watch({ root = '.', ignore = [], extensions = ['.js'] }, watchDependencies = false) {
+module.exports = function watch(
+	{ log, root = '.', ignore = [], extensions = ['.js'] },
+	watchDependencies = false
+) {
+	log.silly(`Extensions: ${extensions.join(', ')}`)
 	if (extensions.length > 1 || extensions[0] !== '.js') {
+		log.debug('Extensions list not default. Enabling transpilers.')
 		require('./enable-extensions')(extensions)
 	}
 
@@ -24,16 +30,24 @@ module.exports = function watch({ root = '.', ignore = [], extensions = ['.js'] 
 
 	const external = new EventEmitter()
 
+	const matchFiles = extensions.map(ext => `${resolvePath(root).replace(/\\/g, '/')}/**/tsconfig${ext}`)
+	const ignored = [
+		'**/.git',
+		'**/node_modules',
+
+		...ignore.map(fp => resolvePath(fp))
+	]
+
+	log.debug(`Looking for files matching [
+		${matchFiles.join('\n\t\t')}
+	], while ignoring [
+		${ignored.join('\n\t\t')}
+	]`.replace(/\t/g, '    '))
 	const buildWatcher = chokidar.watch(
-		extensions.map(ext => `${resolvePath(root).replace(/\\/g, '/')}/**/tsconfig${ext}`),
+		matchFiles,
 		{
 			ignoreInitial: false,
-			ignored: [
-				'**/.git',
-				'**/node_modules',
-
-				...ignore.map(fp => resolvePath(fp))
-			],
+			ignored,
 		}
 	)
 

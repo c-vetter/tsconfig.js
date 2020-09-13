@@ -1,12 +1,16 @@
+const EventEmitter = require('events')
+
 const { DepGraph } = require('dependency-graph')
 const fs = require('fs-extra')
 
 const extractDependencies = require('./src/extract-dependencies')
 const make = require('./src/make')
 const watch = require('./src/watcher')
+const withLogger = require('./src/with-logger')
 
 const {
 	ERROR,
+	READY,
 
 	CREATE_TARGET, CREATE_DEPENDENCY,
 	UPDATE_TARGET, UPDATE_DEPENDENCY,
@@ -14,49 +18,63 @@ const {
 } = require('./src/events')
 
 
-module.exports = tsconfigWatch
+module.exports = withLogger(tsconfigWatch)
 
-function tsconfigWatch (options = {}) {
+function tsconfigWatch (options) {
+	const { log } = options
+	const external = new EventEmitter()
+
+	const handleError = (file) => error => {
+		file
+		? log.error(`Error while processing ‘${file}’:`)
+		: log.error(`Error from file watcher:`)
+
+		log.errorError(error)
+
+		external.emit(ERROR, error)
+	}
+
 	const watcher = watch(options, true)
+	watcher.on(ERROR, handleError())
+	watcher.on(READY, () => external.emit(READY))
+	external.close = () => watcher.close()
 
 	const dependenciesMap = new DepGraph()
 
 	let _queue = Promise.resolve()
 	const queue = (action) => { _queue = _queue.then(action) }
 
-	const emitError = e => watcher.emit(ERROR, e)
-
 	watcher.on(CREATE_TARGET, file => queue(() => (
 		add(file, true)
 		.then(() => build(file, options))
-		.catch(emitError)
+		.catch(handleError(file))
 	)))
 	watcher.on(UPDATE_TARGET, file => queue(() => (
 		build(file, options)
-		.catch(emitError)
+		.catch(handleError(file))
 	)))
 	watcher.on(DELETE_TARGET, file => queue(() => (
 		build(file, options)
 		.then(() => remove(file, true))
-		.catch(emitError)
+		.catch(handleError(file))
 	)))
 
 	watcher.on(CREATE_DEPENDENCY, file => queue(() => (
 		add(file)
 		.then(() => build(file, options))
-		.catch(emitError)
+		.catch(handleError(file))
 	)))
 	watcher.on(UPDATE_DEPENDENCY, file => queue(() => (
 		build(file, options)
-		.catch(emitError)
+		.catch(handleError(file))
 	)))
 	watcher.on(DELETE_DEPENDENCY, file => queue(() => (
 		build(file, options)
 		.then(() => remove(file))
-		.catch(emitError)
+		.catch(handleError(file))
 	)))
 
-	return watcher
+	return external
 
 
 	// Event Handlers

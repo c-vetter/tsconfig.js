@@ -1,1 +1,1 @@
-const baseConfig = require('../tsconfig')
+module.exports = require('../tsconfig')

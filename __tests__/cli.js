@@ -98,7 +98,7 @@ test('all parameters', t => {
 			root: 'root',
 			addComments: 'none',
 			extendsStrategy: 'ext',
-			extensions: ['ext1', 'ext2', 'ext3'],
+			extensions: ['.ext1', '.ext2', '.ext3'],
 			ignore: [p1, p2, p3],
 		}
 	)
@@ -108,9 +108,12 @@ function checkOptions (t, input, optionsRequired) {
 	const optionsExpected = {
 		addComments: undefined,
 		extendsStrategy: undefined,
-		extensions: ['js'],
+		extensions: ['.js'],
 		ignore: [],
 		root: undefined,
+		logFile: undefined,
+		logLevel: undefined,
+		logToConsole: undefined,
 
 		...optionsRequired,
 	}
@@ -124,7 +127,7 @@ function checkOptions (t, input, optionsRequired) {
 			return { catch() {} }
 		}
 	})
-	t.deepEqual(options, optionsExpected)
+	t.like(options, optionsExpected)
 
 	prepare(input, true)
 	proxyquire('../cli.js', {
@@ -133,7 +136,7 @@ function checkOptions (t, input, optionsRequired) {
 			return { on() {} }
 		}
 	})
-	t.deepEqual(options, optionsExpected)
+	t.like(options, optionsExpected)
 }
 
 function prepare(input, watch) {
